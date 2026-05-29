@@ -43,7 +43,7 @@ def _csv_url(sheet_url: str, sheet_name: str = "") -> str:
     return f"https://docs.google.com/spreadsheets/d/{sid}/gviz/tq?tqx=out:csv&gid={gid}"
 
 
-def fetch_sheet_payments(sheet_url: str, sheet_name: str = "") -> list[dict]:
+def _fetch_one_sheet(sheet_url: str, sheet_name: str) -> list[dict]:
     url = _csv_url(sheet_url, sheet_name)
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
@@ -70,11 +70,34 @@ def fetch_sheet_payments(sheet_url: str, sheet_name: str = "") -> list[dict]:
             "location": row.get("Payment For Location/Division", "").strip(),
             "payment_mode": row.get("Payment Mode (Accounts)", "").strip(),
         })
-    print(f"Fetched {len(rows)} payment rows with date+amount from sheet")
     return rows
 
 
-def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict]) -> dict:
+def fetch_sheet_payments(sheet_url: str, sheet_name: str = "") -> list[dict]:
+    # "both" merges all known tabs, deduplicating by PRF ID (Expense Reporting preferred)
+    if sheet_name.lower() == "both":
+        er = _fetch_one_sheet(sheet_url, "Expense Reporting")
+        pr = _fetch_one_sheet(sheet_url, "Payment Request")
+        # Build by PRF ID — Expense Reporting takes precedence
+        merged: dict[str, dict] = {}
+        for row in pr:
+            key = row["prf_id"] or f"_nokey_{len(merged)}"
+            merged[key] = row
+        for row in er:
+            key = row["prf_id"] or f"_nokey_{len(merged)}"
+            merged[key] = row  # ER overwrites PR for same ID
+        rows = list(merged.values())
+        print(f"Merged both sheets: {len(er)} Expense Reporting + {len(pr)} Payment Request → {len(rows)} unique rows")
+        return rows
+
+    rows = _fetch_one_sheet(sheet_url, sheet_name)
+    label = sheet_name or "gid=0"
+    print(f"Fetched {len(rows)} payment rows from sheet '{label}'")
+    return rows
+
+
+def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict],
+              local_records: list[dict] | None = None) -> dict:
     # Index Tally vouchers: (date_yyyymmdd, rounded_amount) → [indices]
     t_idx: dict[tuple, list[int]] = {}
     for i, v in enumerate(tally_vouchers):
@@ -105,15 +128,49 @@ def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict]) -> dict:
         for i, v in enumerate(tally_vouchers) if i not in matched_set
     ]
 
+    # Pass 2: match remaining tally_only against local SQLite records
+    local_record_rows: list[dict] = []
+    if local_records:
+        lr_idx: dict[tuple, list[int]] = {}
+        for i, lr in enumerate(local_records):
+            key = (str(lr["date"]), round(float(lr["amount"]), 2))
+            lr_idx.setdefault(key, []).append(i)
+
+        lr_used: set[int] = set()
+        remaining: list[dict] = []
+        for row in tally_only:
+            key = (row["date_key"], round(row["amount"], 2))
+            free = [i for i in lr_idx.get(key, []) if i not in lr_used]
+            if free:
+                idx = free[0]
+                lr_used.add(idx)
+                lr = local_records[idx]
+                local_record_rows.append({
+                    **row,
+                    "vendor": lr.get("vendor", ""),
+                    "category": lr.get("category", ""),
+                    "nature": lr.get("nature", ""),
+                    "location": lr.get("location", ""),
+                    "payment_mode": lr.get("payment_mode", ""),
+                    "narration": lr.get("narration", ""),
+                    "prf_id": lr.get("prf_id", ""),
+                    "record_id": lr["id"],
+                })
+            else:
+                remaining.append(row)
+        tally_only = remaining
+
     return {
         "matched": matched,
         "sheet_only": sheet_only,
         "tally_only": tally_only,
+        "local_record": local_record_rows,
         "summary": {
             "total_sheet": len(sheet_payments),
             "total_tally": len(tally_vouchers),
             "matched": len(matched),
             "sheet_only": len(sheet_only),
             "tally_only": len(tally_only),
+            "local_record": len(local_record_rows),
         },
     }

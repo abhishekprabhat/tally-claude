@@ -303,5 +303,41 @@ tbody tr.row-tally-only { background: #eff6ff; }
 .badge-sheet-only { background: #fed7aa; color: #9a3412; }
 .badge-tally-only { background: #dbeafe; color: #1e40af; }
 
+/* Reconciliation local-record row/badge */
+tbody tr.row-local-record { background: #fffbeb; }
+.badge-local-record { background: #fef3c7; color: #92400e; }
+
 /* Active filter button */
 .recon-filter-btn.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
+
+/* Modal */
+.modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 28px 20px;
+  width: 560px; max-width: 95vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,.22);
+  max-height: 90vh; overflow-y: auto;
+}
+.modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; color: #1a1a2e; }
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal-grid .field { display: flex; flex-direction: column; gap: 4px; }
+.modal-grid .field.full { grid-column: 1 / -1; }
+.modal-grid .field input,
+.modal-grid .field select,
+.modal-grid .field textarea {
+  border: 1px solid #ddd; border-radius: 6px;
+  padding: 8px 12px; font-size: 14px;
+  background: #fafafa; font-family: inherit;
+}
+.modal-grid .field input:focus,
+.modal-grid .field select:focus,
+.modal-grid .field textarea:focus { outline: 2px solid #4f6ef7; border-color: transparent; background: #fff; }
+.modal-grid .field textarea { resize: vertical; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }

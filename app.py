@@ -12,9 +12,11 @@ import ai
 import submissions as sub_store
 import mappings as mapping_store
 import recon as recon_mod
+import records as rec_store
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
+rec_store.init_db()
 
 
 @app.route("/")
@@ -115,6 +117,49 @@ def submit():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/records")
+def list_records():
+    company = request.args.get("company", "")
+    if not company:
+        return jsonify({"error": "company parameter required"}), 400
+    from_date = request.args.get("from", "")
+    to_date = request.args.get("to", "")
+    try:
+        return jsonify(rec_store.get_records(company, from_date, to_date))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/records", methods=["POST"])
+def create_record():
+    data = request.json
+    if not data.get("company"):
+        return jsonify({"error": "company required"}), 400
+    try:
+        return jsonify(rec_store.upsert_record(data)), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/records/<record_id>", methods=["PUT"])
+def update_record(record_id):
+    data = request.json or {}
+    data["id"] = record_id
+    try:
+        return jsonify(rec_store.upsert_record(data))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/records/<record_id>", methods=["DELETE"])
+def delete_record(record_id):
+    try:
+        ok = rec_store.delete_record(record_id)
+        return jsonify({"success": ok})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/debug/sheet")
 def debug_sheet():
     url = request.args.get("url", "")
@@ -147,6 +192,7 @@ def run_reconcile():
         return jsonify({"error": "sheet_url required"}), 400
     try:
         sheet_name = data.get("sheet_name", "")
+        bank_ledger = data.get("bank_ledger", "")
         sheet_payments = recon_mod.fetch_sheet_payments(sheet_url, sheet_name)
         # Apply user date filter (HTML date input gives YYYY-MM-DD)
         from_key = from_date.replace("-", "") if from_date else ""
@@ -157,8 +203,8 @@ def run_reconcile():
                 if (not from_key or p["date_key"] >= from_key)
                 and (not to_key or p["date_key"] <= to_key)
             ]
-        # Fetch Tally vouchers, filter to the sheet's date range
-        tally_vouchers = tally.get_existing_vouchers(company)
+        # Fetch only Payment vouchers (not Receipts) from Tally, filtered to HDFC if specified
+        tally_vouchers = tally.get_payment_vouchers(company, bank_ledger)
         if sheet_payments:
             dates = [p["date_key"] for p in sheet_payments if p["date_key"]]
             lo, hi = min(dates), max(dates)
@@ -169,7 +215,8 @@ def run_reconcile():
             lo, hi = "", ""
         if lo and hi:
             tally_vouchers = [v for v in tally_vouchers if lo <= v["date"] <= hi]
-        result = recon_mod.reconcile(sheet_payments, tally_vouchers)
+        local_records = rec_store.get_records(company, from_date, to_date)
+        result = recon_mod.reconcile(sheet_payments, tally_vouchers, local_records)
         print(f"Reconcile: {result['summary']}")
         return jsonify(result)
     except Exception as e:

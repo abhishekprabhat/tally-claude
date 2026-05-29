@@ -50,6 +50,20 @@ function bindEvents() {
   document.querySelectorAll(".recon-filter-btn").forEach((btn) =>
     btn.addEventListener("click", () => setReconFilter(btn.dataset.filter))
   );
+
+  // Records tab
+  document.getElementById("newRecordBtn").addEventListener("click", () => {
+    openRecordModal({}, null, "records_new");
+  });
+  document.getElementById("recordSearch").addEventListener("input", renderRecordsTable);
+  document.getElementById("recordsExportBtn").addEventListener("click", exportRecordsCSV);
+
+  // Modal
+  document.getElementById("modalCancelBtn").addEventListener("click", closeRecordModal);
+  document.getElementById("modalSaveBtn").addEventListener("click", saveRecord);
+  document.getElementById("recordModal").addEventListener("click", (e) => {
+    if (e.target.id === "recordModal") closeRecordModal();
+  });
 }
 
 // ── Companies & Ledgers ─────────────────────────────────────────────────────
@@ -484,16 +498,17 @@ function toast(msg, type = "info") {
 function switchTab(tab) {
   document.getElementById("tabBank").style.display = tab === "bank" ? "" : "none";
   document.getElementById("tabRecon").style.display = tab === "recon" ? "" : "none";
+  document.getElementById("tabRecords").style.display = tab === "records" ? "" : "none";
   document.querySelectorAll(".tab-btn").forEach((b) =>
     b.classList.toggle("active", b.dataset.tab === tab)
   );
-  // Show/hide bank-specific fields in setup bar
   const bankOnly = ["bankInfoField", "bankLedgerField"];
   bankOnly.forEach((id) => {
     const el = document.getElementById(id);
     if (el && tab !== "bank") el.style.display = "none";
   });
   if (tab === "bank" && detectedBankInfo) updateBankLedgerField();
+  if (tab === "records") loadRecordsTab();
 }
 
 // ── Reconciliation ────────────────────────────────────────────────────────────
@@ -519,6 +534,7 @@ async function runReconciliation() {
         company,
         sheet_url: sheetUrl,
         sheet_name: document.getElementById("sheetTab").value,
+        bank_ledger: document.getElementById("reconBankLedger").value.trim(),
         from_date: document.getElementById("reconFrom").value,
         to_date: document.getElementById("reconTo").value,
       }),
@@ -531,6 +547,7 @@ async function runReconciliation() {
     document.getElementById("reconSumMatched").textContent = s.matched;
     document.getElementById("reconSumSheetOnly").textContent = s.sheet_only;
     document.getElementById("reconSumTallyOnly").textContent = s.tally_only;
+    document.getElementById("reconSumLocalRecord").textContent = s.local_record || 0;
     document.getElementById("reconSummaryBar").style.display = "flex";
     document.getElementById("reconFilterBar").style.display = "flex";
     document.getElementById("reconExportBtn").style.display = "inline-flex";
@@ -538,8 +555,11 @@ async function runReconciliation() {
       b.classList.toggle("active", b.dataset.filter === "all")
     );
     renderReconTable();
-    toast(`Done — ${s.matched} matched, ${s.sheet_only} missing from Tally, ${s.tally_only} not in sheet`,
-      s.sheet_only > 0 ? "error" : "success");
+    const lr = s.local_record || 0;
+    toast(
+      `Done — ${s.matched} matched, ${lr > 0 ? lr + " in records, " : ""}${s.sheet_only} missing from Tally, ${s.tally_only} not in sheet`,
+      s.sheet_only > 0 ? "error" : "success"
+    );
   } catch (e) {
     toast("Reconciliation failed: " + e.message, "error");
   } finally {
@@ -561,10 +581,13 @@ function getFilteredReconRows() {
   const all = [
     ...reconData.matched.map((r) => ({ ...r, _type: "matched" })),
     ...reconData.sheet_only.map((r) => ({ ...r, _type: "sheet_only" })),
+    ...(reconData.local_record || []).map((r) => ({ ...r, _type: "local_record" })),
     ...reconData.tally_only.map((r) => ({ ...r, _type: "tally_only" })),
   ].sort((a, b) => (a.date_key || "").localeCompare(b.date_key || ""));
   return reconFilter === "all" ? all : all.filter((r) => r._type === reconFilter);
 }
+
+let reconRowMap = {};
 
 function renderReconTable() {
   const rows = getFilteredReconRows();
@@ -575,19 +598,36 @@ function renderReconTable() {
     return;
   }
 
+  reconRowMap = {};
+
   const tbody = rows.map((r) => {
     const rowClass = r._type === "matched" ? "row-matched"
       : r._type === "sheet_only" ? "row-sheet-only"
+      : r._type === "local_record" ? "row-local-record"
       : "row-tally-only";
     const badge = r._type === "matched"
       ? `<span class="status-badge badge-matched">Matched</span>`
       : r._type === "sheet_only"
       ? `<span class="status-badge badge-sheet-only">Missing from Tally</span>`
+      : r._type === "local_record"
+      ? `<span class="status-badge badge-local-record">In Records</span>`
       : `<span class="status-badge badge-tally-only">Not in Sheet</span>`;
     const description = esc(r.nature || r.tally_narration || "");
     const formStatus = r.status
       ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3">${esc(r.status)}</span>`
       : `<span style="color:#aaa">—</span>`;
+
+    let action = "";
+    if (r._type === "tally_only") {
+      action = `<button class="btn btn-sm btn-outline add-record-btn"
+        data-date="${r.date_key}" data-amount="${r.amount}"
+        data-narration="${esc(r.tally_narration || '')}">+ Add Record</button>`;
+    } else if (r._type === "local_record" && r.record_id) {
+      reconRowMap[r.record_id] = r;
+      action = `<button class="btn btn-sm btn-outline edit-recon-record-btn"
+        data-record-id="${r.record_id}">Edit</button>`;
+    }
+
     return `<tr class="${rowClass}">
       <td>${badge}</td>
       <td style="white-space:nowrap">${esc(r.date_raw || r.date_key)}</td>
@@ -599,6 +639,7 @@ function renderReconTable() {
       <td style="font-size:12px;color:#555">${esc(r.location)}</td>
       <td class="narration-cell" title="${esc(r.tally_narration)}">${esc(r.tally_narration) || "<span style='color:#aaa'>—</span>"}</td>
       <td>${formStatus}</td>
+      <td>${action}</td>
     </tr>`;
   }).join("");
 
@@ -607,21 +648,39 @@ function renderReconTable() {
       <tr>
         <th>Status</th><th>Date</th><th>Amount</th><th>PRF ID</th>
         <th>Vendor</th><th>Description</th><th>Category</th>
-        <th>Location</th><th>Tally Narration</th><th>Form Status</th>
+        <th>Location</th><th>Tally Narration</th><th>Form Status</th><th></th>
       </tr>
     </thead>
     <tbody>${tbody}</tbody>
   </table>`;
+
+  wrap.querySelectorAll(".add-record-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      openRecordModal({
+        date_key: btn.dataset.date,
+        amount: parseFloat(btn.dataset.amount),
+        tally_narration: btn.dataset.narration,
+      }, null, "recon");
+    })
+  );
+
+  wrap.querySelectorAll(".edit-recon-record-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const rec = reconRowMap[btn.dataset.recordId];
+      if (rec) openRecordModal({ date: rec.date_key, ...rec }, rec.record_id, "recon_edit");
+    })
+  );
 }
 
 function exportReconCSV() {
   const rows = getFilteredReconRows();
   if (!rows.length) return;
   const headers = ["Status", "Date", "Amount", "PRF ID", "Vendor", "Description", "Category", "Location", "Tally Narration", "Form Status"];
+  const statusLabel = { matched: "Matched", sheet_only: "Missing from Tally", local_record: "In Records", tally_only: "Not in Sheet" };
   const csvLines = [
     headers.join(","),
     ...rows.map((r) => [
-      r._type === "matched" ? "Matched" : r._type === "sheet_only" ? "Missing from Tally" : "Not in Sheet",
+      statusLabel[r._type] || r._type,
       r.date_raw || r.date_key,
       r.amount,
       r.prf_id,
@@ -637,5 +696,236 @@ function exportReconCSV() {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `reconciliation_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function dateKeyToInput(d) {
+  d = String(d || "").replace(/-/g, "");
+  if (d.length !== 8) return "";
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+}
+
+function formatDateKey(d) {
+  d = String(d || "").replace(/-/g, "");
+  if (d.length !== 8) return d;
+  return `${d.slice(6, 8)}-${d.slice(4, 6)}-${d.slice(0, 4)}`;
+}
+
+function round2(n) { return Math.round(n * 100) / 100; }
+
+// ── Record Modal ──────────────────────────────────────────────────────────────
+
+let currentModalContext = null;
+
+function openRecordModal(rowData, recordId = null, mode = "recon") {
+  currentModalContext = { mode, rowData, recordId };
+  document.getElementById("modalTitle").textContent = recordId ? "Edit Payment Record" : "Add Payment Record";
+
+  const dateKey = rowData.date_key || rowData.date || "";
+  document.getElementById("modalDate").value = dateKeyToInput(dateKey);
+  document.getElementById("modalAmount").value = rowData.amount || "";
+  document.getElementById("modalVendor").value = rowData.vendor || "";
+  document.getElementById("modalPaymentMode").value = rowData.payment_mode || "";
+  document.getElementById("modalNature").value = rowData.nature || "";
+  document.getElementById("modalCategory").value = rowData.category || "";
+  document.getElementById("modalLocation").value = rowData.location || "";
+  document.getElementById("modalNarration").value = rowData.narration || rowData.tally_narration || "";
+  document.getElementById("modalPrfId").value = rowData.prf_id || "";
+
+  document.getElementById("recordModal").style.display = "flex";
+  setTimeout(() => document.getElementById("modalVendor").focus(), 50);
+}
+
+function closeRecordModal() {
+  document.getElementById("recordModal").style.display = "none";
+  currentModalContext = null;
+}
+
+async function saveRecord() {
+  const company = document.getElementById("companySelect").value;
+  if (!company) return toast("Select a company first", "error");
+
+  const ctx = currentModalContext;
+  if (!ctx) return;
+
+  const dateInput = document.getElementById("modalDate").value;
+  if (!dateInput) return toast("Date is required", "error");
+
+  const amount = parseFloat(document.getElementById("modalAmount").value);
+  if (!amount || amount <= 0) return toast("Valid amount is required", "error");
+
+  const payload = {
+    company,
+    date: dateInput,
+    amount,
+    vendor: document.getElementById("modalVendor").value.trim(),
+    payment_mode: document.getElementById("modalPaymentMode").value,
+    nature: document.getElementById("modalNature").value.trim(),
+    category: document.getElementById("modalCategory").value.trim(),
+    location: document.getElementById("modalLocation").value.trim(),
+    narration: document.getElementById("modalNarration").value.trim(),
+    prf_id: document.getElementById("modalPrfId").value.trim(),
+    source: "manual",
+  };
+  if (ctx.recordId) payload.id = ctx.recordId;
+
+  const btn = document.getElementById("modalSaveBtn");
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+
+  try {
+    const method = ctx.recordId ? "PUT" : "POST";
+    const url = ctx.recordId ? `/api/records/${ctx.recordId}` : "/api/records";
+    const saved = await apiFetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    toast(ctx.recordId ? "Record updated" : "Record saved", "success");
+    closeRecordModal();
+
+    if (ctx.mode === "recon") {
+      const dateKey = dateInput.replace(/-/g, "");
+      const amt = round2(parseFloat(ctx.rowData.amount || amount));
+      const idx = (reconData.tally_only || []).findIndex(
+        (r) => r.date_key === dateKey && round2(r.amount) === amt
+      );
+      if (idx !== -1) {
+        const row = reconData.tally_only.splice(idx, 1)[0];
+        if (!reconData.local_record) reconData.local_record = [];
+        reconData.local_record.push({ ...row, ...saved, record_id: saved.id });
+        reconData.summary.tally_only = Math.max(0, (reconData.summary.tally_only || 1) - 1);
+        reconData.summary.local_record = (reconData.summary.local_record || 0) + 1;
+        document.getElementById("reconSumTallyOnly").textContent = reconData.summary.tally_only;
+        document.getElementById("reconSumLocalRecord").textContent = reconData.summary.local_record;
+        renderReconTable();
+      }
+    } else if (ctx.mode === "recon_edit") {
+      const idx = (reconData.local_record || []).findIndex((r) => r.record_id === ctx.recordId);
+      if (idx !== -1) {
+        reconData.local_record[idx] = { ...reconData.local_record[idx], ...saved, record_id: saved.id };
+        renderReconTable();
+      }
+    } else {
+      await loadRecordsTab();
+    }
+  } catch (e) {
+    toast("Save failed: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save Record";
+  }
+}
+
+// ── Payment Records Tab ───────────────────────────────────────────────────────
+
+let allRecords = [];
+
+async function loadRecordsTab() {
+  const company = document.getElementById("companySelect").value;
+  const wrap = document.getElementById("recordsTableWrap");
+  if (!company) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>Select a company to view payment records</p></div>`;
+    return;
+  }
+  try {
+    allRecords = await apiFetch(`/api/records?company=${encodeURIComponent(company)}`);
+    renderRecordsTable();
+  } catch (e) {
+    toast("Failed to load records: " + e.message, "error");
+  }
+}
+
+function renderRecordsTable() {
+  const wrap = document.getElementById("recordsTableWrap");
+  const q = (document.getElementById("recordSearch").value || "").toLowerCase();
+  const filtered = allRecords.filter((r) =>
+    !q || [r.vendor, r.category, r.nature, r.location, r.narration, r.prf_id]
+      .some((f) => (f || "").toLowerCase().includes(q))
+  );
+
+  if (!filtered.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>${allRecords.length ? "No matching records" : "No records yet — use the Reconciliation tab to add records for Tally-only payments"}</p></div>`;
+    return;
+  }
+
+  const tbody = filtered.map((r) => `
+    <tr>
+      <td style="white-space:nowrap">${formatDateKey(r.date)}</td>
+      <td class="amount-cell">₹${Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+      <td class="narration-cell" title="${esc(r.vendor)}">${esc(r.vendor) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.category) || "<span style='color:#aaa'>—</span>"}</td>
+      <td class="narration-cell" title="${esc(r.nature)}">${esc(r.nature) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.location) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.payment_mode) || "<span style='color:#aaa'>—</span>"}</td>
+      <td><span style="font-family:monospace;font-size:12px">${esc(r.prf_id)}</span></td>
+      <td><span class="status-badge" style="${r.source === "zoho_import" ? "background:#e0e7ff;color:#3730a3" : "background:#f0fdf4;color:#166534"}">${r.source === "zoho_import" ? "Zoho Import" : "Manual"}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-sm btn-outline edit-record-btn" data-id="${r.id}" style="margin-right:4px">Edit</button>
+        <button class="btn btn-sm del-record-btn" data-id="${r.id}" style="background:#fee2e2;color:#991b1b;border:none">Delete</button>
+      </td>
+    </tr>`).join("");
+
+  wrap.innerHTML = `<table>
+    <thead>
+      <tr>
+        <th>Date</th><th>Amount</th><th>Vendor</th><th>Category</th>
+        <th>Nature</th><th>Location</th><th>Mode</th><th>PRF ID</th>
+        <th>Source</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>${tbody}</tbody>
+  </table>`;
+
+  wrap.querySelectorAll(".edit-record-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const rec = allRecords.find((r) => r.id === btn.dataset.id);
+      if (rec) openRecordModal(rec, rec.id, "records_edit");
+    })
+  );
+
+  wrap.querySelectorAll(".del-record-btn").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      if (!confirm("Delete this record?")) return;
+      try {
+        await apiFetch(`/api/records/${btn.dataset.id}`, { method: "DELETE" });
+        allRecords = allRecords.filter((r) => r.id !== btn.dataset.id);
+        renderRecordsTable();
+        toast("Record deleted", "success");
+      } catch (e) {
+        toast("Delete failed: " + e.message, "error");
+      }
+    })
+  );
+}
+
+function exportRecordsCSV() {
+  const q = (document.getElementById("recordSearch").value || "").toLowerCase();
+  const filtered = allRecords.filter((r) =>
+    !q || [r.vendor, r.category, r.nature, r.location, r.narration, r.prf_id]
+      .some((f) => (f || "").toLowerCase().includes(q))
+  );
+  if (!filtered.length) return;
+  const headers = ["Date", "Amount", "Vendor", "Category", "Nature", "Location", "Mode", "PRF ID", "Narration", "Source"];
+  const csvLines = [
+    headers.join(","),
+    ...filtered.map((r) => [
+      formatDateKey(r.date), r.amount,
+      `"${(r.vendor || "").replace(/"/g, '""')}"`,
+      `"${(r.category || "").replace(/"/g, '""')}"`,
+      `"${(r.nature || "").replace(/"/g, '""')}"`,
+      `"${(r.location || "").replace(/"/g, '""')}"`,
+      r.payment_mode, r.prf_id,
+      `"${(r.narration || "").replace(/"/g, '""')}"`,
+      r.source,
+    ].join(","))
+  ];
+  const blob = new Blob([csvLines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `payment_records_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
 }

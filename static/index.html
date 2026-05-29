@@ -40,6 +40,7 @@
   <div class="tab-nav">
     <button class="tab-btn active" data-tab="bank">Bank → Tally</button>
     <button class="tab-btn" data-tab="recon">Reconciliation</button>
+    <button class="tab-btn" data-tab="records">Payment Records</button>
   </div>
 
   <!-- ── Tab: Bank → Tally ─────────────────────────────────────────────────── -->
@@ -93,10 +94,15 @@
       </div>
       <div class="field">
         <label>Sheet Tab</label>
-        <select id="sheetTab" style="min-width:180px">
+        <select id="sheetTab" style="min-width:200px">
+          <option value="both">Both sheets (merged)</option>
           <option value="Expense Reporting">Expense Reporting (FY26-27)</option>
           <option value="Payment Request">Payment Request (FY25-26)</option>
         </select>
+      </div>
+      <div class="field">
+        <label>Bank Ledger (Tally)</label>
+        <input type="text" id="reconBankLedger" list="ledgerList" placeholder="e.g. HDFC Bank" style="min-width:180px" />
       </div>
       <div class="field">
         <label>From Date</label>
@@ -117,6 +123,7 @@
       <div class="summary-item"><div class="val" id="reconSumMatched" style="color:#16a34a">0</div><div class="lbl">Matched</div></div>
       <div class="summary-item"><div class="val" id="reconSumSheetOnly" style="color:#c2410c">0</div><div class="lbl">Missing from Tally</div></div>
       <div class="summary-item"><div class="val" id="reconSumTallyOnly" style="color:#1d4ed8">0</div><div class="lbl">Not in Sheet</div></div>
+      <div class="summary-item"><div class="val" id="reconSumLocalRecord" style="color:#b45309">0</div><div class="lbl">In Records</div></div>
     </div>
 
     <!-- Filter bar -->
@@ -125,6 +132,7 @@
       <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="sheet_only">Missing from Tally</button>
       <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="matched">Matched</button>
       <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="tally_only">Not in Sheet</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="local_record">In Records</button>
     </div>
 
     <!-- Results table -->
@@ -137,10 +145,83 @@
 
   </div><!-- #tabRecon -->
 
+  <!-- ── Tab: Payment Records ─────────────────────────────────────────────── -->
+  <div id="tabRecords" style="display:none">
+    <div class="actions-bar">
+      <button class="btn btn-primary" id="newRecordBtn">+ New Request</button>
+      <div class="spacer"></div>
+      <input type="text" id="recordSearch" placeholder="Search vendor, category, nature..." style="border:1px solid #ddd;border-radius:6px;padding:8px 12px;font-size:14px;min-width:260px;background:#fafafa" />
+      <button class="btn btn-outline btn-sm" id="recordsExportBtn">↓ Export CSV</button>
+    </div>
+    <div class="table-wrap" id="recordsTableWrap">
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>Select a company to view payment records</p>
+      </div>
+    </div>
+  </div><!-- #tabRecords -->
+
 </div><!-- .container -->
+
+<!-- Record Modal -->
+<div id="recordModal" class="modal-backdrop" style="display:none">
+  <div class="modal">
+    <h3 id="modalTitle">Add Payment Record</h3>
+    <div class="modal-grid">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="modalDate" />
+      </div>
+      <div class="field">
+        <label>Amount (₹)</label>
+        <input type="number" id="modalAmount" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="field">
+        <label>Vendor Name</label>
+        <input type="text" id="modalVendor" placeholder="Vendor / Payee name" />
+      </div>
+      <div class="field">
+        <label>Payment Mode</label>
+        <select id="modalPaymentMode">
+          <option value="">Select...</option>
+          <option value="NEFT">NEFT</option>
+          <option value="IMPS">IMPS</option>
+          <option value="RTGS">RTGS</option>
+          <option value="UPI">UPI</option>
+          <option value="Cheque">Cheque</option>
+          <option value="Cash">Cash</option>
+        </select>
+      </div>
+      <div class="field full">
+        <label>Nature of Work</label>
+        <input type="text" id="modalNature" placeholder="What is this payment for?" />
+      </div>
+      <div class="field">
+        <label>Expense Category</label>
+        <input type="text" id="modalCategory" placeholder="e.g. Operations, Marketing" />
+      </div>
+      <div class="field">
+        <label>Location / Division</label>
+        <input type="text" id="modalLocation" placeholder="e.g. Bangalore" />
+      </div>
+      <div class="field full">
+        <label>Notes / Narration</label>
+        <textarea id="modalNarration" rows="2" placeholder="Additional notes or Tally narration..."></textarea>
+      </div>
+      <div class="field">
+        <label>PRF ID (optional)</label>
+        <input type="text" id="modalPrfId" placeholder="Link to Zoho PRF ID" />
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="modalCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="modalSaveBtn">Save Record</button>
+    </div>
+  </div>
+</div>
 
 <datalist id="ledgerList"></datalist>
 <div id="toast"></div>
-<script src="/static/app.js?v=9"></script>
+<script src="/static/app.js?v=12"></script>
 </body>
 </html>
