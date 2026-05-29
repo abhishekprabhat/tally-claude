@@ -10,14 +10,14 @@
 
 <header>
   <div>
-    <h1>Bank Statement → Tally</h1>
+    <h1>Bank → Tally</h1>
     <span>AI-powered ledger mapping &amp; voucher submission</span>
   </div>
 </header>
 
 <div class="container">
 
-  <!-- Setup bar -->
+  <!-- Setup bar (shared) -->
   <div class="setup-bar">
     <div class="field">
       <label>Company</label>
@@ -36,46 +36,111 @@
     <button class="btn btn-outline btn-sm" id="refreshBtn" title="Reload companies & ledgers">↻ Refresh</button>
   </div>
 
-  <!-- Upload -->
-  <div class="upload-zone" id="uploadZone">
-    <div class="icon">📄</div>
-    <p><strong>Click to upload</strong> or drag &amp; drop your bank statement</p>
-    <p>Supports CSV and Excel (.xlsx) files</p>
-    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
+  <!-- Tab nav -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="bank">Bank → Tally</button>
+    <button class="tab-btn" data-tab="recon">Reconciliation</button>
   </div>
 
-  <!-- Actions -->
-  <div class="actions-bar" id="actionsBar" style="display:none">
-    <button class="btn btn-primary" id="parseBtn">⬆ Parse Statement</button>
-    <button class="btn btn-primary" id="suggestBtn" disabled>✨ Get AI Suggestions</button>
-    <button class="btn btn-outline" id="selectAllBtn" style="display:none">☑ Select All</button>
-    <button class="btn btn-outline" id="deselectAllBtn" style="display:none">☐ Deselect All</button>
-    <div class="spacer"></div>
-    <button class="btn btn-success" id="submitBtn" disabled>▶ Submit to Tally</button>
-  </div>
+  <!-- ── Tab: Bank → Tally ─────────────────────────────────────────────────── -->
+  <div id="tabBank">
 
-  <!-- Summary -->
-  <div class="summary-bar" id="summaryBar" style="display:none">
-    <div class="summary-item"><div class="val" id="sumTotal">0</div><div class="lbl">Total</div></div>
-    <div class="summary-item"><div class="val" id="sumDuplicates" style="color:#c2410c">0</div><div class="lbl">Duplicates</div></div>
-    <div class="summary-item"><div class="val" id="sumApproved">0</div><div class="lbl">Approved</div></div>
-    <div class="summary-item"><div class="val" id="sumSubmitted">0</div><div class="lbl">Submitted</div></div>
-    <div class="summary-item"><div class="val" id="sumErrors">0</div><div class="lbl">Errors</div></div>
-  </div>
-
-  <!-- Table -->
-  <div class="table-wrap" id="tableWrap">
-    <div class="empty-state">
-      <div class="icon">🏦</div>
-      <p>Upload a bank statement to get started</p>
+    <!-- Upload -->
+    <div class="upload-zone" id="uploadZone">
+      <div class="icon">📄</div>
+      <p><strong>Click to upload</strong> or drag &amp; drop your bank statement</p>
+      <p>Supports CSV and Excel (.xlsx) files</p>
+      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
     </div>
-  </div>
 
-</div>
+    <!-- Actions -->
+    <div class="actions-bar" id="actionsBar" style="display:none">
+      <button class="btn btn-primary" id="parseBtn">⬆ Parse Statement</button>
+      <button class="btn btn-primary" id="suggestBtn" disabled>✨ Get AI Suggestions</button>
+      <button class="btn btn-outline" id="selectAllBtn" style="display:none">☑ Select All</button>
+      <button class="btn btn-outline" id="deselectAllBtn" style="display:none">☐ Deselect All</button>
+      <div class="spacer"></div>
+      <button class="btn btn-success" id="submitBtn" disabled>▶ Submit to Tally</button>
+    </div>
 
-<!-- Shared datalist for ledger autocomplete -->
+    <!-- Summary -->
+    <div class="summary-bar" id="summaryBar" style="display:none">
+      <div class="summary-item"><div class="val" id="sumTotal">0</div><div class="lbl">Total</div></div>
+      <div class="summary-item"><div class="val" id="sumDuplicates" style="color:#c2410c">0</div><div class="lbl">Duplicates</div></div>
+      <div class="summary-item"><div class="val" id="sumApproved">0</div><div class="lbl">Approved</div></div>
+      <div class="summary-item"><div class="val" id="sumSubmitted">0</div><div class="lbl">Submitted</div></div>
+      <div class="summary-item"><div class="val" id="sumErrors">0</div><div class="lbl">Errors</div></div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap" id="tableWrap">
+      <div class="empty-state">
+        <div class="icon">🏦</div>
+        <p>Upload a bank statement to get started</p>
+      </div>
+    </div>
+
+  </div><!-- #tabBank -->
+
+  <!-- ── Tab: Reconciliation ───────────────────────────────────────────────── -->
+  <div id="tabRecon" style="display:none">
+
+    <!-- Controls -->
+    <div class="setup-bar">
+      <div class="field" style="flex:1;min-width:300px">
+        <label>Google Sheet URL</label>
+        <input type="text" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%" />
+      </div>
+      <div class="field">
+        <label>Sheet Tab</label>
+        <select id="sheetTab" style="min-width:180px">
+          <option value="Expense Reporting">Expense Reporting (FY26-27)</option>
+          <option value="Payment Request">Payment Request (FY25-26)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>From Date</label>
+        <input type="date" id="reconFrom" style="min-width:150px" />
+      </div>
+      <div class="field">
+        <label>To Date</label>
+        <input type="date" id="reconTo" style="min-width:150px" />
+      </div>
+      <button class="btn btn-primary" id="reconBtn">Reconcile</button>
+      <button class="btn btn-outline btn-sm" id="reconExportBtn" style="display:none">↓ Export CSV</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-bar" id="reconSummaryBar" style="display:none">
+      <div class="summary-item"><div class="val" id="reconSumSheet">0</div><div class="lbl">Sheet Payments</div></div>
+      <div class="summary-item"><div class="val" id="reconSumTally">0</div><div class="lbl">Tally Vouchers</div></div>
+      <div class="summary-item"><div class="val" id="reconSumMatched" style="color:#16a34a">0</div><div class="lbl">Matched</div></div>
+      <div class="summary-item"><div class="val" id="reconSumSheetOnly" style="color:#c2410c">0</div><div class="lbl">Missing from Tally</div></div>
+      <div class="summary-item"><div class="val" id="reconSumTallyOnly" style="color:#1d4ed8">0</div><div class="lbl">Not in Sheet</div></div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="actions-bar" id="reconFilterBar" style="display:none">
+      <button class="btn btn-outline btn-sm recon-filter-btn active" data-filter="all">All</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="sheet_only">Missing from Tally</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="matched">Matched</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="tally_only">Not in Sheet</button>
+    </div>
+
+    <!-- Results table -->
+    <div class="table-wrap" id="reconTableWrap">
+      <div class="empty-state">
+        <div class="icon">🔍</div>
+        <p>Select a company, enter the sheet URL and click Reconcile</p>
+      </div>
+    </div>
+
+  </div><!-- #tabRecon -->
+
+</div><!-- .container -->
+
 <datalist id="ledgerList"></datalist>
 <div id="toast"></div>
-<script src="/static/app.js?v=7"></script>
+<script src="/static/app.js?v=9"></script>
 </body>
 </html>

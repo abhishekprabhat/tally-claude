@@ -11,6 +11,7 @@ import statement_parser as stmt_parser
 import ai
 import submissions as sub_store
 import mappings as mapping_store
+import recon as recon_mod
 
 app = Flask(__name__, static_folder="static")
 CORS(app)
@@ -111,6 +112,68 @@ def submit():
             mapping_store.record_mappings(company, submitted_ok)
         return jsonify(results)
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/debug/sheet")
+def debug_sheet():
+    url = request.args.get("url", "")
+    if not url:
+        return jsonify({"error": "url param required"}), 400
+    try:
+        csv_url = recon_mod._csv_url(url)
+        import requests as req, csv, io
+        resp = req.get(csv_url, timeout=30)
+        resp.raise_for_status()
+        reader = csv.DictReader(io.StringIO(resp.text))
+        rows = list(reader)
+        headers = reader.fieldnames or []
+        sample = rows[:5] if rows else []
+        return jsonify({"headers": headers, "total_rows": len(rows), "sample": sample})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/reconcile", methods=["POST"])
+def run_reconcile():
+    data = request.json
+    company = data.get("company", "")
+    sheet_url = data.get("sheet_url", "")
+    from_date = data.get("from_date", "")
+    to_date = data.get("to_date", "")
+    if not company:
+        return jsonify({"error": "company required"}), 400
+    if not sheet_url:
+        return jsonify({"error": "sheet_url required"}), 400
+    try:
+        sheet_name = data.get("sheet_name", "")
+        sheet_payments = recon_mod.fetch_sheet_payments(sheet_url, sheet_name)
+        # Apply user date filter (HTML date input gives YYYY-MM-DD)
+        from_key = from_date.replace("-", "") if from_date else ""
+        to_key = to_date.replace("-", "") if to_date else ""
+        if from_key or to_key:
+            sheet_payments = [
+                p for p in sheet_payments
+                if (not from_key or p["date_key"] >= from_key)
+                and (not to_key or p["date_key"] <= to_key)
+            ]
+        # Fetch Tally vouchers, filter to the sheet's date range
+        tally_vouchers = tally.get_existing_vouchers(company)
+        if sheet_payments:
+            dates = [p["date_key"] for p in sheet_payments if p["date_key"]]
+            lo, hi = min(dates), max(dates)
+        elif from_key or to_key:
+            lo = from_key or "19000101"
+            hi = to_key or "29991231"
+        else:
+            lo, hi = "", ""
+        if lo and hi:
+            tally_vouchers = [v for v in tally_vouchers if lo <= v["date"] <= hi]
+        result = recon_mod.reconcile(sheet_payments, tally_vouchers)
+        print(f"Reconcile: {result['summary']}")
+        return jsonify(result)
+    except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 

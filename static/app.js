@@ -38,6 +38,18 @@ function bindEvents() {
   document.getElementById("selectAllBtn").addEventListener("click", () => setAllApproved(true));
   document.getElementById("deselectAllBtn").addEventListener("click", () => setAllApproved(false));
   document.getElementById("submitBtn").addEventListener("click", submitToTally);
+
+  // Tabs
+  document.querySelectorAll(".tab-btn").forEach((btn) =>
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab))
+  );
+
+  // Reconciliation
+  document.getElementById("reconBtn").addEventListener("click", runReconciliation);
+  document.getElementById("reconExportBtn").addEventListener("click", exportReconCSV);
+  document.querySelectorAll(".recon-filter-btn").forEach((btn) =>
+    btn.addEventListener("click", () => setReconFilter(btn.dataset.filter))
+  );
 }
 
 // ── Companies & Ledgers ─────────────────────────────────────────────────────
@@ -465,4 +477,165 @@ function toast(msg, type = "info") {
   el.className = `show ${type}`;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = ""; }, 3500);
+}
+
+// ── Tab Switching ─────────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  document.getElementById("tabBank").style.display = tab === "bank" ? "" : "none";
+  document.getElementById("tabRecon").style.display = tab === "recon" ? "" : "none";
+  document.querySelectorAll(".tab-btn").forEach((b) =>
+    b.classList.toggle("active", b.dataset.tab === tab)
+  );
+  // Show/hide bank-specific fields in setup bar
+  const bankOnly = ["bankInfoField", "bankLedgerField"];
+  bankOnly.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && tab !== "bank") el.style.display = "none";
+  });
+  if (tab === "bank" && detectedBankInfo) updateBankLedgerField();
+}
+
+// ── Reconciliation ────────────────────────────────────────────────────────────
+
+let reconData = null;
+let reconFilter = "all";
+
+async function runReconciliation() {
+  const company = document.getElementById("companySelect").value;
+  if (!company) return toast("Select a company first", "error");
+  const sheetUrl = document.getElementById("sheetUrl").value.trim();
+  if (!sheetUrl) return toast("Enter the Google Sheet URL", "error");
+
+  const btn = document.getElementById("reconBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Reconciling...';
+
+  try {
+    reconData = await apiFetch("/api/reconcile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company,
+        sheet_url: sheetUrl,
+        sheet_name: document.getElementById("sheetTab").value,
+        from_date: document.getElementById("reconFrom").value,
+        to_date: document.getElementById("reconTo").value,
+      }),
+    });
+
+    reconFilter = "all";
+    const s = reconData.summary;
+    document.getElementById("reconSumSheet").textContent = s.total_sheet;
+    document.getElementById("reconSumTally").textContent = s.total_tally;
+    document.getElementById("reconSumMatched").textContent = s.matched;
+    document.getElementById("reconSumSheetOnly").textContent = s.sheet_only;
+    document.getElementById("reconSumTallyOnly").textContent = s.tally_only;
+    document.getElementById("reconSummaryBar").style.display = "flex";
+    document.getElementById("reconFilterBar").style.display = "flex";
+    document.getElementById("reconExportBtn").style.display = "inline-flex";
+    document.querySelectorAll(".recon-filter-btn").forEach((b) =>
+      b.classList.toggle("active", b.dataset.filter === "all")
+    );
+    renderReconTable();
+    toast(`Done — ${s.matched} matched, ${s.sheet_only} missing from Tally, ${s.tally_only} not in sheet`,
+      s.sheet_only > 0 ? "error" : "success");
+  } catch (e) {
+    toast("Reconciliation failed: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "Reconcile";
+  }
+}
+
+function setReconFilter(f) {
+  reconFilter = f;
+  document.querySelectorAll(".recon-filter-btn").forEach((b) =>
+    b.classList.toggle("active", b.dataset.filter === f)
+  );
+  renderReconTable();
+}
+
+function getFilteredReconRows() {
+  if (!reconData) return [];
+  const all = [
+    ...reconData.matched.map((r) => ({ ...r, _type: "matched" })),
+    ...reconData.sheet_only.map((r) => ({ ...r, _type: "sheet_only" })),
+    ...reconData.tally_only.map((r) => ({ ...r, _type: "tally_only" })),
+  ].sort((a, b) => (a.date_key || "").localeCompare(b.date_key || ""));
+  return reconFilter === "all" ? all : all.filter((r) => r._type === reconFilter);
+}
+
+function renderReconTable() {
+  const rows = getFilteredReconRows();
+  const wrap = document.getElementById("reconTableWrap");
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">✅</div><p>No records in this category</p></div>`;
+    return;
+  }
+
+  const tbody = rows.map((r) => {
+    const rowClass = r._type === "matched" ? "row-matched"
+      : r._type === "sheet_only" ? "row-sheet-only"
+      : "row-tally-only";
+    const badge = r._type === "matched"
+      ? `<span class="status-badge badge-matched">Matched</span>`
+      : r._type === "sheet_only"
+      ? `<span class="status-badge badge-sheet-only">Missing from Tally</span>`
+      : `<span class="status-badge badge-tally-only">Not in Sheet</span>`;
+    const description = esc(r.nature || r.tally_narration || "");
+    const formStatus = r.status
+      ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3">${esc(r.status)}</span>`
+      : `<span style="color:#aaa">—</span>`;
+    return `<tr class="${rowClass}">
+      <td>${badge}</td>
+      <td style="white-space:nowrap">${esc(r.date_raw || r.date_key)}</td>
+      <td class="amount-cell">₹${Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+      <td><span style="font-family:monospace;font-size:12px">${esc(r.prf_id)}</span></td>
+      <td class="narration-cell" title="${esc(r.vendor)}">${esc(r.vendor) || "<span style='color:#aaa'>—</span>"}</td>
+      <td class="narration-cell" title="${description}">${description || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.category) || "<span style='color:#aaa'>—</span>"}</td>
+      <td style="font-size:12px;color:#555">${esc(r.location)}</td>
+      <td class="narration-cell" title="${esc(r.tally_narration)}">${esc(r.tally_narration) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${formStatus}</td>
+    </tr>`;
+  }).join("");
+
+  wrap.innerHTML = `<table>
+    <thead>
+      <tr>
+        <th>Status</th><th>Date</th><th>Amount</th><th>PRF ID</th>
+        <th>Vendor</th><th>Description</th><th>Category</th>
+        <th>Location</th><th>Tally Narration</th><th>Form Status</th>
+      </tr>
+    </thead>
+    <tbody>${tbody}</tbody>
+  </table>`;
+}
+
+function exportReconCSV() {
+  const rows = getFilteredReconRows();
+  if (!rows.length) return;
+  const headers = ["Status", "Date", "Amount", "PRF ID", "Vendor", "Description", "Category", "Location", "Tally Narration", "Form Status"];
+  const csvLines = [
+    headers.join(","),
+    ...rows.map((r) => [
+      r._type === "matched" ? "Matched" : r._type === "sheet_only" ? "Missing from Tally" : "Not in Sheet",
+      r.date_raw || r.date_key,
+      r.amount,
+      r.prf_id,
+      `"${(r.vendor || "").replace(/"/g, '""')}"`,
+      `"${(r.nature || r.tally_narration || "").replace(/"/g, '""')}"`,
+      `"${(r.category || "").replace(/"/g, '""')}"`,
+      `"${(r.location || "").replace(/"/g, '""')}"`,
+      `"${(r.tally_narration || "").replace(/"/g, '""')}"`,
+      `"${(r.status || "").replace(/"/g, '""')}"`,
+    ].join(","))
+  ];
+  const blob = new Blob([csvLines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `reconciliation_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
 }

@@ -261,3 +261,47 @@ select.type-select {
   background: #4f6ef7;
   transition: width .3s;
 }
+
+/* Tab nav */
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0;
+}
+.tab-btn {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  background: #e5e7eb;
+  color: #555;
+  transition: background .15s, color .15s;
+  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+}
+.tab-btn:hover:not(.active) { background: #d1d5db; color: #333; }
+.tab-btn.active {
+  background: #fff;
+  color: #4f6ef7;
+  border-bottom: 2px solid #fff;
+  border-top: 2px solid #e5e7eb;
+  border-left: 2px solid #e5e7eb;
+  border-right: 2px solid #e5e7eb;
+}
+
+/* Reconciliation row colours */
+tbody tr.row-matched  { background: #f0fdf4; }
+tbody tr.row-sheet-only { background: #fff7ed; }
+tbody tr.row-tally-only { background: #eff6ff; }
+
+/* Reconciliation badges */
+.badge-matched    { background: #d1fae5; color: #065f46; }
+.badge-sheet-only { background: #fed7aa; color: #9a3412; }
+.badge-tally-only { background: #dbeafe; color: #1e40af; }
+
+/* Active filter button */
+.recon-filter-btn.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
