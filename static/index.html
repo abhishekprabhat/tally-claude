@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bank → Tally</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Bank Statement → Tally</h1>
+    <span>AI-powered ledger mapping &amp; voucher submission</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Setup bar -->
+  <div class="setup-bar">
+    <div class="field">
+      <label>Company</label>
+      <select id="companySelect">
+        <option value="">Loading...</option>
+      </select>
+    </div>
+    <div class="field" id="bankInfoField" style="display:none">
+      <label>Detected Bank Account</label>
+      <span id="bankInfoLabel" style="font-size:13px;color:#444;padding:8px 0;display:block"></span>
+    </div>
+    <div class="field" id="bankLedgerField" style="display:none">
+      <label>Bank Ledger in Tally</label>
+      <input type="text" id="bankLedgerInput" list="ledgerList" placeholder="Auto-detecting..." style="min-width:220px" />
+    </div>
+    <button class="btn btn-outline btn-sm" id="refreshBtn" title="Reload companies & ledgers">↻ Refresh</button>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="uploadZone">
+    <div class="icon">📄</div>
+    <p><strong>Click to upload</strong> or drag &amp; drop your bank statement</p>
+    <p>Supports CSV and Excel (.xlsx) files</p>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" />
+  </div>
+
+  <!-- Actions -->
+  <div class="actions-bar" id="actionsBar" style="display:none">
+    <button class="btn btn-primary" id="parseBtn">⬆ Parse Statement</button>
+    <button class="btn btn-primary" id="suggestBtn" disabled>✨ Get AI Suggestions</button>
+    <button class="btn btn-outline" id="selectAllBtn" style="display:none">☑ Select All</button>
+    <button class="btn btn-outline" id="deselectAllBtn" style="display:none">☐ Deselect All</button>
+    <div class="spacer"></div>
+    <button class="btn btn-success" id="submitBtn" disabled>▶ Submit to Tally</button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-bar" id="summaryBar" style="display:none">
+    <div class="summary-item"><div class="val" id="sumTotal">0</div><div class="lbl">Total</div></div>
+    <div class="summary-item"><div class="val" id="sumDuplicates" style="color:#c2410c">0</div><div class="lbl">Duplicates</div></div>
+    <div class="summary-item"><div class="val" id="sumApproved">0</div><div class="lbl">Approved</div></div>
+    <div class="summary-item"><div class="val" id="sumSubmitted">0</div><div class="lbl">Submitted</div></div>
+    <div class="summary-item"><div class="val" id="sumErrors">0</div><div class="lbl">Errors</div></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty-state">
+      <div class="icon">🏦</div>
+      <p>Upload a bank statement to get started</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Shared datalist for ledger autocomplete -->
+<datalist id="ledgerList"></datalist>
+<div id="toast"></div>
+<script src="/static/app.js?v=7"></script>
+</body>
+</html>
