@@ -165,15 +165,9 @@
   <!-- ── Tab: Payment History ──────────────────────────────────────────────── -->
   <div id="tabHistory" style="display:none">
 
-    <!-- Import bar -->
-    <div class="setup-bar" id="historyImportBar">
-      <div class="field" style="flex:1;min-width:300px">
-        <label>Google Sheet URL</label>
-        <input type="text" id="historySheetUrl" value="https://docs.google.com/spreadsheets/d/1elzrnTYIqKMpzFV2oDERBuHbGCaQbjo5dPSpiSG5CDk" style="width:100%" />
-      </div>
-      <button class="btn btn-primary" id="importZohoBtn">⬇ Import from Zoho Sheet</button>
-      <span id="importStatus" style="font-size:13px;color:#555;align-self:center"></span>
-    </div>
+    <!-- hidden import inputs kept for JS compatibility -->
+    <input type="hidden" id="historySheetUrl" value="https://docs.google.com/spreadsheets/d/1elzrnTYIqKMpzFV2oDERBuHbGCaQbjo5dPSpiSG5CDk" />
+    <span id="importStatus" style="display:none"></span>
 
     <!-- Filter bar -->
     <div class="setup-bar">

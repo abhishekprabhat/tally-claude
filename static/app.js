@@ -59,7 +59,6 @@ function bindEvents() {
   document.getElementById("recordsExportBtn").addEventListener("click", exportRecordsCSV);
 
   // Payment History tab
-  document.getElementById("importZohoBtn").addEventListener("click", importFromZoho);
   document.getElementById("historyApplyBtn").addEventListener("click", loadHistoryTab);
   document.getElementById("historyClearBtn").addEventListener("click", clearHistoryFilters);
   document.getElementById("historyExportBtn").addEventListener("click", exportHistoryCSV);
