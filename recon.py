@@ -163,51 +163,78 @@ def fetch_sheet_payments(sheet_url: str, sheet_name: str = "") -> list[dict]:
 
 def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict],
               local_records: list[dict] | None = None) -> dict:
-    # Index Tally vouchers: (date_yyyymmdd, rounded_amount) → [indices]
-    t_idx: dict[tuple, list[int]] = {}
+    # Build indexes for Tally vouchers
+    t_prf_idx: dict[str, list[int]] = {}   # reference (PRF ID) → [indices]
+    t_amt_idx: dict[tuple, list[int]] = {}  # (date, amount) → [indices]
     for i, v in enumerate(tally_vouchers):
-        key = (v["date"], round(v["amount"], 2))
-        t_idx.setdefault(key, []).append(i)
+        ref = (v.get("reference") or "").strip()
+        if ref:
+            t_prf_idx.setdefault(ref, []).append(i)
+        t_amt_idx.setdefault((v["date"], round(v["amount"], 2)), []).append(i)
 
     matched_set: set[int] = set()
     matched, sheet_only = [], []
 
     for p in sheet_payments:
-        key = (p["date_key"], round(p["amount"], 2))
-        free = [i for i in t_idx.get(key, []) if i not in matched_set]
-        if free:
-            idx = free[0]
+        idx = None
+        # Pass 1a: match by PRF ID
+        prf = (p.get("prf_id") or "").strip()
+        if prf:
+            free = [i for i in t_prf_idx.get(prf, []) if i not in matched_set]
+            if free:
+                idx = free[0]
+        # Pass 1b: fall back to (date, amount)
+        if idx is None:
+            key = (p["date_key"], round(p["amount"], 2))
+            free = [i for i in t_amt_idx.get(key, []) if i not in matched_set]
+            if free:
+                idx = free[0]
+
+        if idx is not None:
             matched_set.add(idx)
             tv = tally_vouchers[idx]
-            matched.append({**p, "tally_narration": tv.get("narration", ""), "tally_type": tv.get("type", "")})
+            matched.append({**p, "tally_narration": tv.get("narration", ""), "tally_type": tv.get("type", ""), "tally_reference": tv.get("reference", "")})
         else:
-            sheet_only.append({**p, "tally_narration": "", "tally_type": ""})
+            sheet_only.append({**p, "tally_narration": "", "tally_type": "", "tally_reference": ""})
 
     tally_only = [
         {
             "date_key": v["date"], "date_raw": v["date"], "amount": v["amount"],
             "tally_narration": v.get("narration", ""), "tally_type": v.get("type", ""),
-            "status": "", "prf_id": "", "vendor": "", "nature": "",
+            "tally_reference": v.get("reference", ""),
+            "status": "", "prf_id": v.get("reference", ""), "vendor": "", "nature": "",
             "category": "", "location": "", "payment_mode": "",
         }
         for i, v in enumerate(tally_vouchers) if i not in matched_set
     ]
 
-    # Pass 2: match remaining tally_only against local SQLite records
+    # Pass 2: match remaining tally_only against local SQLite records (PRF ID first, then date+amount)
     local_record_rows: list[dict] = []
     if local_records:
-        lr_idx: dict[tuple, list[int]] = {}
+        lr_prf_idx: dict[str, list[int]] = {}
+        lr_amt_idx: dict[tuple, list[int]] = {}
         for i, lr in enumerate(local_records):
-            key = (str(lr["date"]), round(float(lr["amount"]), 2))
-            lr_idx.setdefault(key, []).append(i)
+            prf = (lr.get("prf_id") or "").strip()
+            if prf:
+                lr_prf_idx.setdefault(prf, []).append(i)
+            lr_amt_idx.setdefault((str(lr["date"]), round(float(lr["amount"]), 2)), []).append(i)
 
         lr_used: set[int] = set()
         remaining: list[dict] = []
         for row in tally_only:
-            key = (row["date_key"], round(row["amount"], 2))
-            free = [i for i in lr_idx.get(key, []) if i not in lr_used]
-            if free:
-                idx = free[0]
+            idx = None
+            ref = (row.get("tally_reference") or "").strip()
+            if ref:
+                free = [i for i in lr_prf_idx.get(ref, []) if i not in lr_used]
+                if free:
+                    idx = free[0]
+            if idx is None:
+                key = (row["date_key"], round(row["amount"], 2))
+                free = [i for i in lr_amt_idx.get(key, []) if i not in lr_used]
+                if free:
+                    idx = free[0]
+
+            if idx is not None:
                 lr_used.add(idx)
                 lr = local_records[idx]
                 local_record_rows.append({

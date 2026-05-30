@@ -183,7 +183,7 @@ def get_payment_vouchers(company: str, bank_ledger: str = "") -> list[dict]:
         <TDLMESSAGE>
           <COLLECTION NAME="PV" ISMODIFY="No">
             <TYPE>Voucher</TYPE>
-            <NATIVEMETHOD>Date, Narration, VoucherTypeName, Amount</NATIVEMETHOD>
+            <NATIVEMETHOD>Date, Narration, VoucherTypeName, Amount, Reference</NATIVEMETHOD>
             <FILTER>PayFilter</FILTER>
           </COLLECTION>
           <SYSTEM TYPE="Formulae" NAME="PayFilter">
@@ -199,13 +199,14 @@ def get_payment_vouchers(company: str, bank_ledger: str = "") -> list[dict]:
         for v in root.findall(".//VOUCHER"):
             date = (v.findtext("DATE") or "").strip()
             narration = (v.findtext("NARRATION") or "").strip()
+            reference = (v.findtext("REFERENCE") or "").strip()
             amount_str = (v.findtext("AMOUNT") or "0").strip()
             try:
                 amount = abs(float(amount_str.replace(",", "")))
             except Exception:
                 amount = 0.0
             if date and amount > 0:
-                entries.append({"date": date, "narration": narration, "type": "Payment", "amount": amount})
+                entries.append({"date": date, "narration": narration, "reference": reference, "type": "Payment", "amount": amount})
         return entries
 
     try:
