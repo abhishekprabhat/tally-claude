@@ -319,8 +319,13 @@ select.type-select {
 /* Create-record cell */
 .recon-create-cell { text-align: center; }
 
+/* Tentative match */
+.recon-table td.rc-tentative { background: #fefce8; }
+.tentative-tally-amt { font-size: 11px; color: #a16207; }
+
 /* Badges */
 .badge-matched         { background: #d1fae5; color: #065f46; }
+.badge-tentative       { background: #fef9c3; color: #854d0e; }
 .badge-sheet-only      { background: #ede9fe; color: #5b21b6; }
 .badge-tally-only      { background: #dbeafe; color: #1e40af; }
 .badge-amount-mismatch { background: #ffedd5; color: #c2410c; }

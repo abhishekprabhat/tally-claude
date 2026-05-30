@@ -69,6 +69,10 @@ function bindEvents() {
   document.getElementById("recordModal").addEventListener("click", (e) => {
     if (e.target.id === "recordModal") closeRecordModal();
   });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && document.getElementById("recordModal").style.display === "flex")
+      closeRecordModal();
+  });
   // Dynamic sub-division based on selected location
   document.getElementById("modalLocation").addEventListener("input", updateSubDivisionList);
   document.getElementById("modalLocation").addEventListener("change", updateSubDivisionList);
@@ -582,6 +586,12 @@ function setReconFilter(f) {
   renderReconTable();
 }
 
+function isTentative(r) {
+  if (r._type !== "matched") return false;
+  const tallyAmt  = r.tally_amount ?? r.amount;
+  return Math.abs(tallyAmt - r.amount) >= 1;
+}
+
 function getFilteredReconRows() {
   if (!reconData) return [];
   const tallyRows = [
@@ -595,7 +605,8 @@ function getFilteredReconRows() {
 
   if (reconFilter === "all")             return tallyRows;
   if (reconFilter === "pending")         return pendingRows;
-  if (reconFilter === "matched")         return tallyRows.filter((r) => r._type === "matched");
+  if (reconFilter === "tentative")       return tallyRows.filter(isTentative);
+  if (reconFilter === "matched")         return tallyRows.filter((r) => r._type === "matched" && !isTentative(r));
   if (reconFilter === "tally_only")      return tallyRows.filter((r) => r._type === "tally_only");
   if (reconFilter === "amount_mismatch") return tallyRows.filter((r) => r._type === "amount_mismatch");
   return tallyRows;
@@ -621,10 +632,13 @@ function renderReconTable() {
   const isPending = reconFilter === "pending";
 
   const tbody = rows.map((r) => {
-    const type = r._type;
+    const type      = r._type;
+    const tentative = isTentative(r);
 
     // ── Badge ──────────────────────────────────────────────────────────
-    const badge = type === "matched"
+    const badge = tentative
+      ? `<span class="status-badge badge-tentative">Tentative</span>`
+      : type === "matched"
       ? `<span class="status-badge badge-matched">Matched</span>`
       : type === "amount_mismatch"
       ? `<span class="status-badge badge-amount-mismatch">Amt Mismatch</span>`
@@ -664,7 +678,8 @@ function renderReconTable() {
       ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3;font-size:11px">${esc(r.status)}</span>`
       : "";
 
-    const rcClass = type === "matched" ? "rc-matched"
+    const rcClass = tentative ? "rc-tentative"
+      : type === "matched" ? "rc-matched"
       : type === "amount_mismatch" ? "rc-mismatch"
       : type === "pending" ? "rc-pending"
       : "rc-empty";
@@ -695,6 +710,8 @@ function renderReconTable() {
       const subDiv    = esc(r.sub_division || "");
       const recAmtFmt = type === "amount_mismatch"
         ? `<span class="mismatch-rec-amt">${_fmtAmt(r.record_amount)}</span>`
+        : tentative
+        ? `<span>${_fmtAmt(r.amount)}</span><br><span class="tentative-tally-amt">Tally: ${_fmtAmt(r.tally_amount)}</span>`
         : `<span>${_fmtAmt(r.amount)}</span>`;
 
       recContent = `
@@ -707,7 +724,7 @@ function renderReconTable() {
         <td class="${rcClass}">${action}</td>`;
     }
 
-    return `<tr class="recon-row-${type}">
+    return `<tr class="recon-row-${tentative ? "tentative" : type}">
       <td class="tc">${badge}</td>
       <td class="tc" style="white-space:nowrap">${tallyDate}</td>
       <td class="tc amount-cell">${tallyAmtCell}</td>
