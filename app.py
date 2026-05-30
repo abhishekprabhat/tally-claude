@@ -245,6 +245,7 @@ def run_reconcile():
                 "nature":      r.get("nature", ""),
                 "category":    r.get("category", ""),
                 "location":    r.get("location", ""),
+                "sub_division":r.get("sub_division", ""),
                 "payment_mode":r.get("payment_mode", ""),
                 "status":      r.get("payment_status", ""),
                 "record_id":   r["id"],

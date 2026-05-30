@@ -671,7 +671,7 @@ function renderReconTable() {
 
     let recContent, action;
     if (type === "tally_only") {
-      recContent = `<td class="rc-empty recon-create-cell" colspan="5">
+      recContent = `<td class="rc-empty recon-create-cell" colspan="6">
         <button class="btn btn-sm btn-outline add-record-btn"
           data-date="${r.date_key}" data-amount="${r.amount}"
           data-prf="${esc(r.prf_id || '')}"
@@ -692,13 +692,18 @@ function renderReconTable() {
         recAmtCell = `<span>${_fmtAmt(r.amount)}</span>`;
       }
 
+      const subDiv    = esc(r.sub_division || "");
+      const recAmtFmt = type === "amount_mismatch"
+        ? `<span class="mismatch-rec-amt">${_fmtAmt(r.record_amount)}</span>`
+        : `<span>${_fmtAmt(r.amount)}</span>`;
+
       recContent = `
-        <td class="${rcClass}"><span style="font-family:monospace;font-size:12px">${recPrf}</span>${recAmtCell ? `<br>${recAmtCell}` : ""}</td>
-        <td class="${rcClass} narration-cell" title="${vendor}">${vendor || "<span style='color:#bbb'>—</span>"}</td>
-        <td class="${rcClass} narration-cell" title="${nature}">${nature || "<span style='color:#bbb'>—</span>"}</td>
-        <td class="${rcClass}">${category || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass}" style="white-space:nowrap">${recAmtFmt}</td>
         <td class="${rcClass}" style="font-size:12px">${location || "<span style='color:#bbb'>—</span>"}</td>
-        <td class="${rcClass}">${payStat}</td>
+        <td class="${rcClass}" style="font-size:12px">${subDiv || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass}" style="font-size:12px">${category || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass}"><span style="font-family:monospace;font-size:12px">${recPrf}</span></td>
+        <td class="${rcClass} narration-cell" title="${nature}">${nature || "<span style='color:#bbb'>—</span>"}</td>
         <td class="${rcClass}">${action}</td>`;
     }
 
@@ -716,7 +721,7 @@ function renderReconTable() {
     <thead>
       <tr class="recon-header-group">
         <th colspan="5" class="tally-group-header">Tally Entry</th>
-        <th colspan="6" class="record-group-header">Matched Record</th>
+        <th colspan="7" class="record-group-header">Matched Record</th>
       </tr>
       <tr>
         <th class="tc">Status</th>
@@ -724,12 +729,12 @@ function renderReconTable() {
         <th class="tc">Amount</th>
         <th class="tc">Tally PRF</th>
         <th class="tc tc-sep">Narration</th>
-        <th>Record PRF / Amt</th>
-        <th>Vendor</th>
-        <th>Nature</th>
-        <th>Category</th>
+        <th>Amount</th>
         <th>Location</th>
-        <th>Pay Status</th>
+        <th>Sub-Division</th>
+        <th>Exp. Type</th>
+        <th>PRF ID</th>
+        <th>Nature</th>
         <th></th>
       </tr>
     </thead>
