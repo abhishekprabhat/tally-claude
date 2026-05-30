@@ -553,6 +553,7 @@ async function runReconciliation() {
     document.getElementById("reconSumMatched").textContent = s.matched;
     document.getElementById("reconSumSheetOnly").textContent = s.sheet_only;
     document.getElementById("reconSumTallyOnly").textContent = s.tally_only;
+    document.getElementById("reconSumMismatch").textContent = s.amount_mismatch || 0;
     document.getElementById("reconSummaryBar").style.display = "flex";
     document.getElementById("reconFilterBar").style.display = "flex";
     document.getElementById("reconExportBtn").style.display = "inline-flex";
@@ -560,9 +561,10 @@ async function runReconciliation() {
       b.classList.toggle("active", b.dataset.filter === "all")
     );
     renderReconTable();
+    const mm = s.amount_mismatch || 0;
     toast(
-      `Done — ${s.matched} matched, ${s.sheet_only} pending, ${s.tally_only} tally only`,
-      s.tally_only > 0 ? "error" : "success"
+      `Done — ${s.matched} matched, ${s.sheet_only} pending, ${s.tally_only} tally only${mm ? ", " + mm + " amt mismatch" : ""}`,
+      (s.tally_only > 0 || mm > 0) ? "error" : "success"
     );
   } catch (e) {
     toast("Reconciliation failed: " + e.message, "error");
@@ -582,15 +584,28 @@ function setReconFilter(f) {
 
 function getFilteredReconRows() {
   if (!reconData) return [];
-  const all = [
+  const tallyRows = [
     ...reconData.matched.map((r) => ({ ...r, _type: "matched" })),
-    ...reconData.sheet_only.map((r) => ({ ...r, _type: "sheet_only" })),
     ...reconData.tally_only.map((r) => ({ ...r, _type: "tally_only" })),
+    ...(reconData.amount_mismatch || []).map((r) => ({ ...r, _type: "amount_mismatch" })),
   ].sort((a, b) => (a.date_key || "").localeCompare(b.date_key || ""));
-  return reconFilter === "all" ? all : all.filter((r) => r._type === reconFilter);
+  const pendingRows = (reconData.sheet_only || [])
+    .map((r) => ({ ...r, _type: "pending" }))
+    .sort((a, b) => (a.date_key || "").localeCompare(b.date_key || ""));
+
+  if (reconFilter === "all")             return tallyRows;
+  if (reconFilter === "pending")         return pendingRows;
+  if (reconFilter === "matched")         return tallyRows.filter((r) => r._type === "matched");
+  if (reconFilter === "tally_only")      return tallyRows.filter((r) => r._type === "tally_only");
+  if (reconFilter === "amount_mismatch") return tallyRows.filter((r) => r._type === "amount_mismatch");
+  return tallyRows;
 }
 
 let reconRowMap = {};
+
+function _fmtAmt(n) {
+  return "₹" + Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
 
 function renderReconTable() {
   const rows = getFilteredReconRows();
@@ -603,53 +618,119 @@ function renderReconTable() {
 
   reconRowMap = {};
 
-  const tbody = rows.map((r) => {
-    const rowClass = r._type === "matched" ? "row-matched"
-      : r._type === "sheet_only" ? "row-sheet-only"
-      : "row-tally-only";
-    const badge = r._type === "matched"
-      ? `<span class="status-badge badge-matched">Matched</span>`
-      : r._type === "sheet_only"
-      ? `<span class="status-badge badge-sheet-only">Pending</span>`
-      : `<span class="status-badge badge-tally-only">Tally Only</span>`;
-    const description = esc(r.nature || r.tally_narration || "");
-    const formStatus = r.status
-      ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3">${esc(r.status)}</span>`
-      : `<span style="color:#aaa">—</span>`;
+  const isPending = reconFilter === "pending";
 
-    let action = "";
-    if (r._type === "tally_only") {
-      action = `<button class="btn btn-sm btn-outline add-record-btn"
-        data-date="${r.date_key}" data-amount="${r.amount}"
-        data-prf="${esc(r.prf_id || '')}"
-        data-narration="${esc(r.tally_narration || '')}">+ Add Record</button>`;
-    } else if (r.record_id) {
-      reconRowMap[r.record_id] = r;
-      action = `<button class="btn btn-sm btn-outline edit-recon-record-btn"
-        data-record-id="${r.record_id}">Edit</button>`;
+  const tbody = rows.map((r) => {
+    const type = r._type;
+
+    // ── Badge ──────────────────────────────────────────────────────────
+    const badge = type === "matched"
+      ? `<span class="status-badge badge-matched">Matched</span>`
+      : type === "amount_mismatch"
+      ? `<span class="status-badge badge-amount-mismatch">Amt Mismatch</span>`
+      : type === "tally_only"
+      ? `<span class="status-badge badge-tally-only">Tally Only</span>`
+      : `<span class="status-badge badge-sheet-only">Pending</span>`;
+
+    // ── Tally side ─────────────────────────────────────────────────────
+    const tallyDate    = esc(r.date_raw || r.date_key || "");
+    const tallyAmt     = type === "pending" ? "" : _fmtAmt(r.tally_amount ?? r.amount);
+    const tallyPrf     = esc(r.tally_reference || "");
+    const tallyNarr    = esc(r.tally_narration || "");
+
+    let tallyAmtCell;
+    if (type === "amount_mismatch") {
+      tallyAmtCell = `<span class="mismatch-amt">${_fmtAmt(r.amount)}</span>`;
+    } else if (type === "pending") {
+      tallyAmtCell = `<span style="color:#bbb">—</span>`;
+    } else {
+      tallyAmtCell = tallyAmt;
     }
 
-    return `<tr class="${rowClass}">
-      <td>${badge}</td>
-      <td style="white-space:nowrap">${esc(r.date_raw || r.date_key)}</td>
-      <td class="amount-cell">₹${Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-      <td><span style="font-family:monospace;font-size:12px">${esc(r.prf_id)}</span></td>
-      <td class="narration-cell" title="${esc(r.vendor)}">${esc(r.vendor) || "<span style='color:#aaa'>—</span>"}</td>
-      <td class="narration-cell" title="${description}">${description || "<span style='color:#aaa'>—</span>"}</td>
-      <td>${esc(r.category) || "<span style='color:#aaa'>—</span>"}</td>
-      <td style="font-size:12px;color:#555">${esc(r.location)}</td>
-      <td class="narration-cell" title="${esc(r.tally_narration)}">${esc(r.tally_narration) || "<span style='color:#aaa'>—</span>"}</td>
-      <td>${formStatus}</td>
-      <td>${action}</td>
+    const tallyNarrCell = type === "pending"
+      ? `<span style="color:#bbb;font-style:italic">No Tally entry</span>`
+      : `<span class="narration-cell" title="${tallyNarr}">${tallyNarr || "<span style='color:#bbb'>—</span>"}</span>`;
+
+    // ── Record side ────────────────────────────────────────────────────
+    const recPrf    = esc(r.prf_id || "");
+    const recAmt    = (type === "matched" || type === "amount_mismatch" || type === "pending")
+                      ? _fmtAmt(type === "amount_mismatch" ? r.record_amount : r.amount)
+                      : "";
+    const vendor    = esc(r.vendor || "");
+    const nature    = esc(r.nature || "");
+    const category  = esc(r.category || "");
+    const location  = esc(r.location || "");
+    const payStat   = r.status
+      ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3;font-size:11px">${esc(r.status)}</span>`
+      : "";
+
+    const rcClass = type === "matched" ? "rc-matched"
+      : type === "amount_mismatch" ? "rc-mismatch"
+      : type === "pending" ? "rc-pending"
+      : "rc-empty";
+
+    let recContent, action;
+    if (type === "tally_only") {
+      recContent = `<td class="rc-empty recon-create-cell" colspan="5">
+        <button class="btn btn-sm btn-outline add-record-btn"
+          data-date="${r.date_key}" data-amount="${r.amount}"
+          data-prf="${esc(r.prf_id || '')}"
+          data-narration="${esc(r.tally_narration || '')}">+ Create Record</button>
+      </td><td class="rc-empty"></td>`;
+    } else {
+      if (r.record_id) {
+        reconRowMap[r.record_id] = r;
+        action = `<button class="btn btn-sm btn-outline edit-recon-record-btn" data-record-id="${r.record_id}">Edit</button>`;
+      } else {
+        action = "";
+      }
+
+      let recAmtCell = "";
+      if (type === "amount_mismatch") {
+        recAmtCell = `<span class="mismatch-rec-amt">${_fmtAmt(r.record_amount)}</span>`;
+      } else if (type === "pending") {
+        recAmtCell = `<span>${_fmtAmt(r.amount)}</span>`;
+      }
+
+      recContent = `
+        <td class="${rcClass}"><span style="font-family:monospace;font-size:12px">${recPrf}</span>${recAmtCell ? `<br>${recAmtCell}` : ""}</td>
+        <td class="${rcClass} narration-cell" title="${vendor}">${vendor || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass} narration-cell" title="${nature}">${nature || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass}">${category || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass}" style="font-size:12px">${location || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass}">${payStat}</td>
+        <td class="${rcClass}">${action}</td>`;
+    }
+
+    return `<tr class="recon-row-${type}">
+      <td class="tc">${badge}</td>
+      <td class="tc" style="white-space:nowrap">${tallyDate}</td>
+      <td class="tc amount-cell">${tallyAmtCell}</td>
+      <td class="tc"><span style="font-family:monospace;font-size:12px">${tallyPrf}</span></td>
+      <td class="tc tc-sep narration-cell" title="${tallyNarr}">${tallyNarrCell}</td>
+      ${recContent}
     </tr>`;
   }).join("");
 
-  wrap.innerHTML = `<table>
+  wrap.innerHTML = `<table class="recon-table">
     <thead>
+      <tr class="recon-header-group">
+        <th colspan="5" class="tally-group-header">Tally Entry</th>
+        <th colspan="6" class="record-group-header">Matched Record</th>
+      </tr>
       <tr>
-        <th>Status</th><th>Date</th><th>Amount</th><th>PRF ID</th>
-        <th>Vendor</th><th>Description</th><th>Category</th>
-        <th>Location</th><th>Tally Narration</th><th>Form Status</th><th></th>
+        <th class="tc">Status</th>
+        <th class="tc">Date</th>
+        <th class="tc">Amount</th>
+        <th class="tc">Tally PRF</th>
+        <th class="tc tc-sep">Narration</th>
+        <th>Record PRF / Amt</th>
+        <th>Vendor</th>
+        <th>Nature</th>
+        <th>Category</th>
+        <th>Location</th>
+        <th>Pay Status</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>${tbody}</tbody>
@@ -658,10 +739,10 @@ function renderReconTable() {
   wrap.querySelectorAll(".add-record-btn").forEach((btn) =>
     btn.addEventListener("click", () => {
       openRecordModal({
-        date_key: btn.dataset.date,
-        amount: parseFloat(btn.dataset.amount),
-        tally_narration: btn.dataset.narration,
-        prf_id: btn.dataset.prf,
+        date_key:       btn.dataset.date,
+        amount:         parseFloat(btn.dataset.amount),
+        tally_narration:btn.dataset.narration,
+        prf_id:         btn.dataset.prf,
       }, null, "recon");
     })
   );
@@ -677,20 +758,22 @@ function renderReconTable() {
 function exportReconCSV() {
   const rows = getFilteredReconRows();
   if (!rows.length) return;
-  const headers = ["Status", "Date", "Amount", "PRF ID", "Vendor", "Description", "Category", "Location", "Tally Narration", "Form Status"];
-  const statusLabel = { matched: "Matched", sheet_only: "Pending", tally_only: "Tally Only" };
+  const headers = ["Status", "Date", "Tally Amount", "Tally PRF", "Tally Narration", "Record PRF", "Record Amount", "Vendor", "Nature", "Category", "Location", "Pay Status"];
+  const statusLabel = { matched: "Matched", pending: "Pending", tally_only: "Tally Only", amount_mismatch: "Amt Mismatch" };
   const csvLines = [
     headers.join(","),
     ...rows.map((r) => [
       statusLabel[r._type] || r._type,
       r.date_raw || r.date_key,
-      r.amount,
-      r.prf_id,
+      r._type === "pending" ? "" : (r.tally_amount ?? r.amount),
+      r.tally_reference || "",
+      `"${(r.tally_narration || "").replace(/"/g, '""')}"`,
+      r.prf_id || "",
+      r._type === "amount_mismatch" ? r.record_amount : (r._type === "pending" ? r.amount : ""),
       `"${(r.vendor || "").replace(/"/g, '""')}"`,
-      `"${(r.nature || r.tally_narration || "").replace(/"/g, '""')}"`,
+      `"${(r.nature || "").replace(/"/g, '""')}"`,
       `"${(r.category || "").replace(/"/g, '""')}"`,
       `"${(r.location || "").replace(/"/g, '""')}"`,
-      `"${(r.tally_narration || "").replace(/"/g, '""')}"`,
       `"${(r.status || "").replace(/"/g, '""')}"`,
     ].join(","))
   ];

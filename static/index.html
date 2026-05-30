@@ -112,14 +112,16 @@
       <div class="summary-item"><div class="val" id="reconSumMatched" style="color:#16a34a">0</div><div class="lbl">Matched</div></div>
       <div class="summary-item"><div class="val" id="reconSumSheetOnly" style="color:#c2410c">0</div><div class="lbl">Pending</div></div>
       <div class="summary-item"><div class="val" id="reconSumTallyOnly" style="color:#1d4ed8">0</div><div class="lbl">Tally Only</div></div>
+      <div class="summary-item"><div class="val" id="reconSumMismatch" style="color:#d97706">0</div><div class="lbl">Amt Mismatch</div></div>
     </div>
 
     <!-- Filter bar -->
     <div class="actions-bar" id="reconFilterBar" style="display:none">
-      <button class="btn btn-outline btn-sm recon-filter-btn active" data-filter="all">All</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn active" data-filter="all">All Tally</button>
       <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="matched">Matched</button>
-      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="sheet_only">Pending</button>
       <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="tally_only">Tally Only</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="amount_mismatch">Amt Mismatch</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="pending">Pending</button>
     </div>
 
     <!-- Results table -->

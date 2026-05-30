@@ -293,19 +293,37 @@ select.type-select {
   border-right: 2px solid #e5e7eb;
 }
 
-/* Reconciliation row colours */
-tbody tr.row-matched  { background: #f0fdf4; }
-tbody tr.row-sheet-only { background: #fff7ed; }
-tbody tr.row-tally-only { background: #eff6ff; }
+/* ── Tally-centric reconciliation table ─────────────────────────────── */
 
-/* Reconciliation badges */
-.badge-matched    { background: #d1fae5; color: #065f46; }
-.badge-sheet-only { background: #fed7aa; color: #9a3412; }
-.badge-tally-only { background: #dbeafe; color: #1e40af; }
+/* Tally-side cells (all rows) */
+.recon-table td.tc, .recon-table th.tc { background: #f1f5f9; }
+.recon-table td.tc-sep, .recon-table th.tc-sep {
+  border-right: 2px solid #cbd5e1 !important;
+}
 
-/* Reconciliation local-record row/badge */
-tbody tr.row-local-record { background: #fffbeb; }
-.badge-local-record { background: #fef3c7; color: #92400e; }
+/* Group header row */
+.recon-table .recon-header-group th { padding: 4px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.recon-table .tally-group-header  { background: #e2e8f0; color: #475569; border-right: 2px solid #cbd5e1; }
+.recon-table .record-group-header { background: #f8fafc; color: #64748b; }
+
+/* Record-side cell tints */
+.recon-table td.rc-matched   { background: #f0fdf4; }
+.recon-table td.rc-mismatch  { background: #fff7ed; }
+.recon-table td.rc-pending   { background: #faf5ff; }
+.recon-table td.rc-empty     { background: #fafafa; }
+
+/* Mismatch amount highlights */
+.mismatch-amt     { color: #d97706; font-weight: 600; }
+.mismatch-rec-amt { font-size: 11px; color: #9a3412; }
+
+/* Create-record cell */
+.recon-create-cell { text-align: center; }
+
+/* Badges */
+.badge-matched         { background: #d1fae5; color: #065f46; }
+.badge-sheet-only      { background: #ede9fe; color: #5b21b6; }
+.badge-tally-only      { background: #dbeafe; color: #1e40af; }
+.badge-amount-mismatch { background: #ffedd5; color: #c2410c; }
 
 /* Active filter button */
 .recon-filter-btn.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }

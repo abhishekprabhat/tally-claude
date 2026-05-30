@@ -193,11 +193,11 @@ def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict],
         if idx is not None:
             matched_set.add(idx)
             tv = tally_vouchers[idx]
-            matched.append({**p, "tally_narration": tv.get("narration", ""), "tally_type": tv.get("type", ""), "tally_reference": tv.get("reference", "")})
+            matched.append({**p, "tally_narration": tv.get("narration", ""), "tally_type": tv.get("type", ""), "tally_reference": tv.get("reference", ""), "tally_amount": tv["amount"]})
         else:
             sheet_only.append({**p, "tally_narration": "", "tally_type": "", "tally_reference": ""})
 
-    tally_only = [
+    tally_only_raw = [
         {
             "date_key": v["date"], "date_raw": v["date"], "amount": v["amount"],
             "tally_narration": v.get("narration", ""), "tally_type": v.get("type", ""),
@@ -208,61 +208,44 @@ def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict],
         for i, v in enumerate(tally_vouchers) if i not in matched_set
     ]
 
-    # Pass 2: match remaining tally_only against local SQLite records (PRF ID first, then date+amount)
-    local_record_rows: list[dict] = []
-    if local_records:
-        lr_prf_idx: dict[str, list[int]] = {}
-        lr_amt_idx: dict[tuple, list[int]] = {}
-        for i, lr in enumerate(local_records):
-            prf = (lr.get("prf_id") or "").strip()
-            if prf:
-                lr_prf_idx.setdefault(prf, []).append(i)
-            lr_amt_idx.setdefault((str(lr["date"]), round(float(lr["amount"]), 2)), []).append(i)
-
-        lr_used: set[int] = set()
-        remaining: list[dict] = []
-        for row in tally_only:
-            idx = None
-            ref = (row.get("tally_reference") or "").strip()
-            if ref:
-                free = [i for i in lr_prf_idx.get(ref, []) if i not in lr_used]
-                if free:
-                    idx = free[0]
-            if idx is None:
-                key = (row["date_key"], round(row["amount"], 2))
-                free = [i for i in lr_amt_idx.get(key, []) if i not in lr_used]
-                if free:
-                    idx = free[0]
-
-            if idx is not None:
-                lr_used.add(idx)
-                lr = local_records[idx]
-                local_record_rows.append({
-                    **row,
-                    "vendor": lr.get("vendor", ""),
-                    "category": lr.get("category", ""),
-                    "nature": lr.get("nature", ""),
-                    "location": lr.get("location", ""),
-                    "payment_mode": lr.get("payment_mode", ""),
-                    "narration": lr.get("narration", ""),
-                    "prf_id": lr.get("prf_id", ""),
-                    "record_id": lr["id"],
-                })
-            else:
-                remaining.append(row)
-        tally_only = remaining
+    # Detect amount-mismatch: tally-only entries whose PRF reference exists in primary list
+    # (same PRF, but amount in Tally differs from amount in the record)
+    primary_prf_map: dict[str, dict] = {
+        (p.get("prf_id") or "").strip(): p
+        for p in sheet_payments if p.get("prf_id")
+    }
+    amount_mismatch: list[dict] = []
+    tally_only: list[dict] = []
+    for row in tally_only_raw:
+        ref = (row.get("tally_reference") or "").strip()
+        if ref and ref in primary_prf_map:
+            rec = primary_prf_map[ref]
+            amount_mismatch.append({
+                **row,
+                "prf_id":          ref,
+                "vendor":          rec.get("vendor", ""),
+                "nature":          rec.get("nature", ""),
+                "category":        rec.get("category", ""),
+                "location":        rec.get("location", ""),
+                "status":          rec.get("status", ""),
+                "record_id":       rec.get("record_id", ""),
+                "record_amount":   rec.get("amount", 0),  # what the record says
+            })
+        else:
+            tally_only.append(row)
 
     return {
         "matched": matched,
         "sheet_only": sheet_only,
         "tally_only": tally_only,
-        "local_record": local_record_rows,
+        "amount_mismatch": amount_mismatch,
+        "local_record": [],
         "summary": {
             "total_sheet": len(sheet_payments),
             "total_tally": len(tally_vouchers),
             "matched": len(matched),
             "sheet_only": len(sheet_only),
             "tally_only": len(tally_only),
-            "local_record": len(local_record_rows),
+            "amount_mismatch": len(amount_mismatch),
         },
     }
