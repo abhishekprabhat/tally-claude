@@ -64,6 +64,9 @@ function bindEvents() {
   document.getElementById("recordModal").addEventListener("click", (e) => {
     if (e.target.id === "recordModal") closeRecordModal();
   });
+  // Dynamic sub-division based on selected location
+  document.getElementById("modalLocation").addEventListener("input", updateSubDivisionList);
+  document.getElementById("modalLocation").addEventListener("change", updateSubDivisionList);
 }
 
 // ── Companies & Ledgers ─────────────────────────────────────────────────────
@@ -699,6 +702,54 @@ function exportReconCSV() {
   a.click();
 }
 
+// ── Division → Sub-Division mapping (derived from Zoho sheet history) ─────────
+
+const SUBDIVISION_MAP = {
+  "Ayodhya":        ["Ayodhya - Others","Ayodhya - Office Expense","Ayodhya - Branding","Ayodhya - Mandir Share"],
+  "Bageshwar Dham": ["Bageshwar Dham - Branding","Bageshwar Dham - Office Expense","Bageshwar Dham - Others","Bageshwar Dham - Mandir Share"],
+  "Bhopal-Accounts":["Accounts - Others","Accounts - TDS","Accounts - GST","Accounts - Consultancy"],
+  "Bhopal-BD":      ["BD - Travel","BD - Others"],
+  "Bhopal-Content": ["Content - Others","Content - Software"],
+  "Bhopal-Ecommerce":["Ecommerce - Ads","Ecommerce - Shipping","Ecommerce - Others"],
+  "Bhopal-HO":      ["HO - Office Expense","HO - Others","HO - Rent"],
+  "Bhopal-HR":      ["HR - Online Services","HR - Others","HR - Hospitality"],
+  "Bhopal-Inventory":["Inventory - Others","Inventory - 6D Machines","Inventory - VR Headsets","Inventory - Packaging","Inventory - SenseXR","Inventory - Oculus"],
+  "Bhopal-Kendra HO":["Kendra HO - Travel","Kendra HO - Branding"],
+  "Bhopal-Tech":    ["Tech - Software Subscription","Tech - Others","Tech - Cloud"],
+  "Delhi":          ["Delhi - Branding","Delhi - Office Expense"],
+  "Delhi NCR":      ["Delhi - Branding","Delhi - Office Expense"],
+  "Dewas":          ["Dewas - Mandir Share","Dewas - Branding"],
+  "Haridwar":       ["Haridwar - Branding","Haridwar - Others","Haridwar - Office Expense","Haridwar - Mandir Share","Haridwar - Consumables"],
+  "ISKCON-Delhi":   ["Delhi - Office Expense","Delhi - Branding"],
+  "Kashi":          ["Kashi - Office Expense","Kashi - Branding","Kashi - Others","Kashi - Mandir Share","Kashi - Consumables"],
+  "Kurukshetra":    ["Kurukshetra - Office Expense","Kurukshetra - Mandir Share","Kurukshetra - Others","Kurukshetra - Branding"],
+  "Maihar":         ["Maihar - Branding","Maihar - Others","Maihar - Office Expense","Maihar - Consumables"],
+  "Nagpur":         ["Nagpur - Branding","Nagpur - Others","Nagpur - Office Expense","Nagpur - Mandir Share"],
+  "Neelkanth Dham": ["Neelkanth Dham - Office Expense","Neelkanth Dham - Mandir Share","Neelkanth Dham - Others","Neelkanth Dham - Branding"],
+  "Prayagraj":      ["Prayagraj - Others"],
+  "Salary":         ["Salary - Others","Salary - Net Payout","Salary - PF"],
+  "Shirdi":         ["Shirdi - Office Expense","Shirdi - Others","Shirdi - Branding","Shirdi - Mandir Share"],
+  "Ujjain":         ["Ujjain - Office Expense","Ujjain - Others","Ujjain - Mandir Rent","Ujjain - Branding","Ujjain - Consumables"],
+  "Vaishno Devi":   ["Vaishnodevi - Office Expense","Vaishnodevi - Mandir Share","Vaishnodevi - Branding","Vaishnodevi - Others"],
+  "Vertical Hotel": ["Vertical Hotel - Setup","Vertical Hotel - Travelling"],
+  "Vertical Vehicle":["Vertical Vehicle - Setup"],
+  "Vrindavan":      ["Vrindavan - Branding"],
+};
+
+function updateSubDivisionList() {
+  const loc = document.getElementById("modalLocation").value.trim();
+  const subs = SUBDIVISION_MAP[loc] || [];
+  const dl = document.getElementById("subDivisionList");
+  dl.innerHTML = subs.map((s) => `<option value="${esc(s)}">`).join("");
+  // Clear stale sub-division only when switching to a known division that doesn't include it
+  if (subs.length > 0) {
+    const cur = document.getElementById("modalSubDivision").value;
+    if (cur && !subs.includes(cur)) {
+      document.getElementById("modalSubDivision").value = "";
+    }
+  }
+}
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 function dateKeyToInput(d) {
@@ -733,6 +784,7 @@ function openRecordModal(rowData, recordId = null, mode = "recon") {
   const dateKey = rowData.date_key || rowData.date || "";
   document.getElementById("modalDate").value = dateKeyToInput(dateKey);
   document.getElementById("modalLocation").value = rowData.location || "";
+  updateSubDivisionList();   // populate datalist before setting the value
   document.getElementById("modalSubDivision").value = rowData.sub_division || "";
   document.getElementById("modalRaisedBy").value = rowData.raised_by || "";
   document.getElementById("modalMailId").value = rowData.mail_id || "";
