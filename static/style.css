@@ -354,3 +354,11 @@ tbody tr.row-local-record { background: #fffbeb; }
 .modal-grid .field input[readonly] { background: #f0f2f5; color: #6b7280; cursor: default; }
 .modal-grid .field textarea { resize: vertical; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; border-top: 1px solid #f0f2f5; padding-top: 16px; }
+
+/* Field update flash */
+@keyframes fieldFlash {
+  0%   { border-color: #4f6ef7; box-shadow: 0 0 0 3px rgba(79,110,247,.18); background: #f5f7ff; }
+  100% { border-color: #ddd;    box-shadow: none;                            background: #fafafa; }
+}
+.field-updated { animation: fieldFlash .7s ease-out; }
+.field-hint { font-size: 11px; margin-top: 3px; display: block; }

@@ -739,14 +739,39 @@ const SUBDIVISION_MAP = {
 function updateSubDivisionList() {
   const loc = document.getElementById("modalLocation").value.trim();
   const subs = SUBDIVISION_MAP[loc] || [];
-  const dl = document.getElementById("subDivisionList");
-  dl.innerHTML = subs.map((s) => `<option value="${esc(s)}">`).join("");
-  // Clear stale sub-division only when switching to a known division that doesn't include it
-  if (subs.length > 0) {
-    const cur = document.getElementById("modalSubDivision").value;
-    if (cur && !subs.includes(cur)) {
-      document.getElementById("modalSubDivision").value = "";
-    }
+  const subInput = document.getElementById("modalSubDivision");
+
+  // Populate datalist
+  document.getElementById("subDivisionList").innerHTML =
+    subs.map((s) => `<option value="${esc(s)}">`).join("");
+
+  // Clear stale value when switching to a known division
+  if (subs.length > 0 && subInput.value && !subs.includes(subInput.value)) {
+    subInput.value = "";
+  }
+
+  // Hint text (create once, reuse)
+  let hint = document.getElementById("subDivisionHint");
+  if (!hint) {
+    hint = document.createElement("span");
+    hint.id = "subDivisionHint";
+    hint.className = "field-hint";
+    subInput.parentElement.appendChild(hint);
+  }
+
+  if (!loc) {
+    hint.textContent = "Select a location first";
+    hint.style.color = "#9ca3af";
+  } else if (subs.length > 0) {
+    hint.textContent = `${subs.length} options available`;
+    hint.style.color = "#16a34a";
+    // Flash the input to signal the list just updated
+    subInput.classList.remove("field-updated");
+    void subInput.offsetWidth; // force reflow to restart animation
+    subInput.classList.add("field-updated");
+  } else {
+    hint.textContent = "No predefined options — type freely";
+    hint.style.color = "#92400e";
   }
 }
 
@@ -822,6 +847,8 @@ function openRecordModal(rowData, recordId = null, mode = "recon") {
   document.getElementById("modalAccountsRemarks").value = rowData.accounts_remarks || rowData.tally_narration || rowData.narration || "";
 
   document.getElementById("recordModal").style.display = "flex";
+  // Ensure hint is initialised for the current location (including empty state)
+  updateSubDivisionList();
   setTimeout(() => document.getElementById("modalNature").focus(), 50);
 }
 
