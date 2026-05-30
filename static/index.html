@@ -89,18 +89,6 @@
 
     <!-- Controls -->
     <div class="setup-bar">
-      <div class="field" style="flex:1;min-width:300px">
-        <label>Google Sheet URL</label>
-        <input type="text" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%" />
-      </div>
-      <div class="field">
-        <label>Sheet Tab</label>
-        <select id="sheetTab" style="min-width:200px">
-          <option value="both">Both sheets (merged)</option>
-          <option value="Expense Reporting">Expense Reporting (FY26-27)</option>
-          <option value="Payment Request">Payment Request (FY25-26)</option>
-        </select>
-      </div>
       <div class="field">
         <label>Bank Ledger (Tally)</label>
         <input type="text" id="reconBankLedger" list="ledgerList" placeholder="e.g. HDFC Bank" style="min-width:180px" />
@@ -119,28 +107,26 @@
 
     <!-- Summary -->
     <div class="summary-bar" id="reconSummaryBar" style="display:none">
-      <div class="summary-item"><div class="val" id="reconSumSheet">0</div><div class="lbl">Sheet Payments</div></div>
+      <div class="summary-item"><div class="val" id="reconSumSheet">0</div><div class="lbl">Records</div></div>
       <div class="summary-item"><div class="val" id="reconSumTally">0</div><div class="lbl">Tally Vouchers</div></div>
       <div class="summary-item"><div class="val" id="reconSumMatched" style="color:#16a34a">0</div><div class="lbl">Matched</div></div>
-      <div class="summary-item"><div class="val" id="reconSumSheetOnly" style="color:#c2410c">0</div><div class="lbl">Missing from Tally</div></div>
-      <div class="summary-item"><div class="val" id="reconSumTallyOnly" style="color:#1d4ed8">0</div><div class="lbl">Not in Sheet</div></div>
-      <div class="summary-item"><div class="val" id="reconSumLocalRecord" style="color:#b45309">0</div><div class="lbl">In Records</div></div>
+      <div class="summary-item"><div class="val" id="reconSumSheetOnly" style="color:#c2410c">0</div><div class="lbl">Pending</div></div>
+      <div class="summary-item"><div class="val" id="reconSumTallyOnly" style="color:#1d4ed8">0</div><div class="lbl">Tally Only</div></div>
     </div>
 
     <!-- Filter bar -->
     <div class="actions-bar" id="reconFilterBar" style="display:none">
       <button class="btn btn-outline btn-sm recon-filter-btn active" data-filter="all">All</button>
-      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="sheet_only">Missing from Tally</button>
       <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="matched">Matched</button>
-      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="tally_only">Not in Sheet</button>
-      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="local_record">In Records</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="sheet_only">Pending</button>
+      <button class="btn btn-outline btn-sm recon-filter-btn" data-filter="tally_only">Tally Only</button>
     </div>
 
     <!-- Results table -->
     <div class="table-wrap" id="reconTableWrap">
       <div class="empty-state">
         <div class="icon">🔍</div>
-        <p>Select a company, enter the sheet URL and click Reconcile</p>
+        <p>Select a company and click Reconcile</p>
       </div>
     </div>
 

@@ -518,13 +518,7 @@ function switchTab(tab) {
   });
   if (tab === "bank" && detectedBankInfo) updateBankLedgerField();
   if (tab === "records") loadRecordsTab();
-  if (tab === "history") {
-    // Pre-fill sheet URL from reconciliation tab if available
-    const reconUrl = document.getElementById("sheetUrl").value.trim();
-    if (reconUrl && !document.getElementById("historySheetUrl").value.trim()) {
-      document.getElementById("historySheetUrl").value = reconUrl;
-    }
-  }
+  if (tab === "history") loadHistoryTab();
 }
 
 // ── Reconciliation ────────────────────────────────────────────────────────────
@@ -535,8 +529,6 @@ let reconFilter = "all";
 async function runReconciliation() {
   const company = document.getElementById("companySelect").value;
   if (!company) return toast("Select a company first", "error");
-  const sheetUrl = document.getElementById("sheetUrl").value.trim();
-  if (!sheetUrl) return toast("Enter the Google Sheet URL", "error");
 
   const btn = document.getElementById("reconBtn");
   btn.disabled = true;
@@ -548,8 +540,6 @@ async function runReconciliation() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         company,
-        sheet_url: sheetUrl,
-        sheet_name: document.getElementById("sheetTab").value,
         bank_ledger: document.getElementById("reconBankLedger").value.trim(),
         from_date: document.getElementById("reconFrom").value,
         to_date: document.getElementById("reconTo").value,
@@ -563,7 +553,6 @@ async function runReconciliation() {
     document.getElementById("reconSumMatched").textContent = s.matched;
     document.getElementById("reconSumSheetOnly").textContent = s.sheet_only;
     document.getElementById("reconSumTallyOnly").textContent = s.tally_only;
-    document.getElementById("reconSumLocalRecord").textContent = s.local_record || 0;
     document.getElementById("reconSummaryBar").style.display = "flex";
     document.getElementById("reconFilterBar").style.display = "flex";
     document.getElementById("reconExportBtn").style.display = "inline-flex";
@@ -571,10 +560,9 @@ async function runReconciliation() {
       b.classList.toggle("active", b.dataset.filter === "all")
     );
     renderReconTable();
-    const lr = s.local_record || 0;
     toast(
-      `Done — ${s.matched} matched, ${lr > 0 ? lr + " in records, " : ""}${s.sheet_only} missing from Tally, ${s.tally_only} not in sheet`,
-      s.sheet_only > 0 ? "error" : "success"
+      `Done — ${s.matched} matched, ${s.sheet_only} pending, ${s.tally_only} tally only`,
+      s.tally_only > 0 ? "error" : "success"
     );
   } catch (e) {
     toast("Reconciliation failed: " + e.message, "error");
@@ -597,7 +585,6 @@ function getFilteredReconRows() {
   const all = [
     ...reconData.matched.map((r) => ({ ...r, _type: "matched" })),
     ...reconData.sheet_only.map((r) => ({ ...r, _type: "sheet_only" })),
-    ...(reconData.local_record || []).map((r) => ({ ...r, _type: "local_record" })),
     ...reconData.tally_only.map((r) => ({ ...r, _type: "tally_only" })),
   ].sort((a, b) => (a.date_key || "").localeCompare(b.date_key || ""));
   return reconFilter === "all" ? all : all.filter((r) => r._type === reconFilter);
@@ -619,15 +606,12 @@ function renderReconTable() {
   const tbody = rows.map((r) => {
     const rowClass = r._type === "matched" ? "row-matched"
       : r._type === "sheet_only" ? "row-sheet-only"
-      : r._type === "local_record" ? "row-local-record"
       : "row-tally-only";
     const badge = r._type === "matched"
       ? `<span class="status-badge badge-matched">Matched</span>`
       : r._type === "sheet_only"
-      ? `<span class="status-badge badge-sheet-only">Missing from Tally</span>`
-      : r._type === "local_record"
-      ? `<span class="status-badge badge-local-record">In Records</span>`
-      : `<span class="status-badge badge-tally-only">Not in Sheet</span>`;
+      ? `<span class="status-badge badge-sheet-only">Pending</span>`
+      : `<span class="status-badge badge-tally-only">Tally Only</span>`;
     const description = esc(r.nature || r.tally_narration || "");
     const formStatus = r.status
       ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3">${esc(r.status)}</span>`
@@ -637,8 +621,9 @@ function renderReconTable() {
     if (r._type === "tally_only") {
       action = `<button class="btn btn-sm btn-outline add-record-btn"
         data-date="${r.date_key}" data-amount="${r.amount}"
+        data-prf="${esc(r.prf_id || '')}"
         data-narration="${esc(r.tally_narration || '')}">+ Add Record</button>`;
-    } else if (r._type === "local_record" && r.record_id) {
+    } else if (r.record_id) {
       reconRowMap[r.record_id] = r;
       action = `<button class="btn btn-sm btn-outline edit-recon-record-btn"
         data-record-id="${r.record_id}">Edit</button>`;
@@ -676,6 +661,7 @@ function renderReconTable() {
         date_key: btn.dataset.date,
         amount: parseFloat(btn.dataset.amount),
         tally_narration: btn.dataset.narration,
+        prf_id: btn.dataset.prf,
       }, null, "recon");
     })
   );
@@ -692,7 +678,7 @@ function exportReconCSV() {
   const rows = getFilteredReconRows();
   if (!rows.length) return;
   const headers = ["Status", "Date", "Amount", "PRF ID", "Vendor", "Description", "Category", "Location", "Tally Narration", "Form Status"];
-  const statusLabel = { matched: "Matched", sheet_only: "Missing from Tally", local_record: "In Records", tally_only: "Not in Sheet" };
+  const statusLabel = { matched: "Matched", sheet_only: "Pending", tally_only: "Tally Only" };
   const csvLines = [
     headers.join(","),
     ...rows.map((r) => [

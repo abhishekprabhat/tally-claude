@@ -227,40 +227,42 @@ def debug_sheet():
 def run_reconcile():
     data = request.json
     company = data.get("company", "")
-    sheet_url = data.get("sheet_url", "")
     from_date = data.get("from_date", "")
     to_date = data.get("to_date", "")
+    bank_ledger = data.get("bank_ledger", "")
     if not company:
         return jsonify({"error": "company required"}), 400
-    if not sheet_url:
-        return jsonify({"error": "sheet_url required"}), 400
     try:
-        sheet_name = data.get("sheet_name", "")
-        bank_ledger = data.get("bank_ledger", "")
-        sheet_payments = recon_mod.fetch_sheet_payments(sheet_url, sheet_name)
-        # Apply user date filter (HTML date input gives YYYY-MM-DD)
-        from_key = from_date.replace("-", "") if from_date else ""
-        to_key = to_date.replace("-", "") if to_date else ""
-        if from_key or to_key:
-            sheet_payments = [
-                p for p in sheet_payments
-                if (not from_key or p["date_key"] >= from_key)
-                and (not to_key or p["date_key"] <= to_key)
-            ]
-        # Fetch only Payment vouchers (not Receipts) from Tally, filtered to HDFC if specified
+        # SQLite records are the primary reconciliation source
+        db_records = rec_store.get_records(company, from_date, to_date)
+        sheet_payments = [
+            {
+                "date_key":    r["date"],
+                "date_raw":    r["date"],
+                "amount":      float(r["amount"]),
+                "prf_id":      r.get("prf_id", ""),
+                "vendor":      r.get("vendor", ""),
+                "nature":      r.get("nature", ""),
+                "category":    r.get("category", ""),
+                "location":    r.get("location", ""),
+                "payment_mode":r.get("payment_mode", ""),
+                "status":      r.get("payment_status", ""),
+                "record_id":   r["id"],
+            }
+            for r in db_records
+        ]
         tally_vouchers = tally.get_payment_vouchers(company, bank_ledger)
-        if sheet_payments:
-            dates = [p["date_key"] for p in sheet_payments if p["date_key"]]
-            lo, hi = min(dates), max(dates)
-        elif from_key or to_key:
+        from_key = from_date.replace("-", "") if from_date else ""
+        to_key   = to_date.replace("-", "")   if to_date   else ""
+        if from_key or to_key:
             lo = from_key or "19000101"
-            hi = to_key or "29991231"
-        else:
-            lo, hi = "", ""
-        if lo and hi:
+            hi = to_key   or "29991231"
             tally_vouchers = [v for v in tally_vouchers if lo <= v["date"] <= hi]
-        local_records = rec_store.get_records(company, from_date, to_date)
-        result = recon_mod.reconcile(sheet_payments, tally_vouchers, local_records)
+        elif sheet_payments:
+            dates = [p["date_key"] for p in sheet_payments if p["date_key"]]
+            if dates:
+                tally_vouchers = [v for v in tally_vouchers if min(dates) <= v["date"] <= max(dates)]
+        result = recon_mod.reconcile(sheet_payments, tally_vouchers)
         print(f"Reconcile: {result['summary']}")
         return jsonify(result)
     except Exception as e:
