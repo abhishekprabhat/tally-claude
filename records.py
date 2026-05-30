@@ -90,7 +90,8 @@ def init_db():
                 pass  # column already exists
 
 
-def get_records(company: str, from_date: str = "", to_date: str = "") -> list[dict]:
+def get_records(company: str, from_date: str = "", to_date: str = "",
+                status: str = "", location: str = "", source: str = "") -> list[dict]:
     q = "SELECT * FROM payment_records WHERE company = ?"
     params: list = [company]
     if from_date:
@@ -99,10 +100,28 @@ def get_records(company: str, from_date: str = "", to_date: str = "") -> list[di
     if to_date:
         q += " AND date <= ?"
         params.append(to_date.replace("-", ""))
+    if status:
+        q += " AND payment_status = ?"
+        params.append(status)
+    if location:
+        q += " AND location = ?"
+        params.append(location)
+    if source:
+        q += " AND source = ?"
+        params.append(source)
     q += " ORDER BY date DESC"
     with _conn() as c:
         rows = c.execute(q, params).fetchall()
     return [dict(r) for r in rows]
+
+
+def get_by_prf_id(company: str, prf_id: str) -> dict | None:
+    with _conn() as c:
+        row = c.execute(
+            "SELECT * FROM payment_records WHERE company = ? AND prf_id = ?",
+            (company, prf_id),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def upsert_record(data: dict) -> dict:

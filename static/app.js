@@ -58,6 +58,12 @@ function bindEvents() {
   document.getElementById("recordSearch").addEventListener("input", renderRecordsTable);
   document.getElementById("recordsExportBtn").addEventListener("click", exportRecordsCSV);
 
+  // Payment History tab
+  document.getElementById("importZohoBtn").addEventListener("click", importFromZoho);
+  document.getElementById("historyApplyBtn").addEventListener("click", loadHistoryTab);
+  document.getElementById("historyClearBtn").addEventListener("click", clearHistoryFilters);
+  document.getElementById("historyExportBtn").addEventListener("click", exportHistoryCSV);
+
   // Modal
   document.getElementById("modalCancelBtn").addEventListener("click", closeRecordModal);
   document.getElementById("modalSaveBtn").addEventListener("click", saveRecord);
@@ -499,9 +505,10 @@ function toast(msg, type = "info") {
 // ── Tab Switching ─────────────────────────────────────────────────────────────
 
 function switchTab(tab) {
-  document.getElementById("tabBank").style.display = tab === "bank" ? "" : "none";
-  document.getElementById("tabRecon").style.display = tab === "recon" ? "" : "none";
-  document.getElementById("tabRecords").style.display = tab === "records" ? "" : "none";
+  ["bank", "recon", "records", "history"].forEach((t) => {
+    document.getElementById("tab" + t.charAt(0).toUpperCase() + t.slice(1)).style.display =
+      t === tab ? "" : "none";
+  });
   document.querySelectorAll(".tab-btn").forEach((b) =>
     b.classList.toggle("active", b.dataset.tab === tab)
   );
@@ -512,6 +519,13 @@ function switchTab(tab) {
   });
   if (tab === "bank" && detectedBankInfo) updateBankLedgerField();
   if (tab === "records") loadRecordsTab();
+  if (tab === "history") {
+    // Pre-fill sheet URL from reconciliation tab if available
+    const reconUrl = document.getElementById("sheetUrl").value.trim();
+    if (reconUrl && !document.getElementById("historySheetUrl").value.trim()) {
+      document.getElementById("historySheetUrl").value = reconUrl;
+    }
+  }
 }
 
 // ── Reconciliation ────────────────────────────────────────────────────────────
@@ -1047,6 +1061,182 @@ function renderRecordsTable() {
       }
     })
   );
+}
+
+// ── Payment History Tab ───────────────────────────────────────────────────────
+
+let historyRecords = [];
+
+async function importFromZoho() {
+  const company = document.getElementById("companySelect").value;
+  if (!company) return toast("Select a company first", "error");
+  const sheetUrl = document.getElementById("historySheetUrl").value.trim();
+  if (!sheetUrl) return toast("Enter the Google Sheet URL", "error");
+
+  const btn = document.getElementById("importZohoBtn");
+  const status = document.getElementById("importStatus");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Importing...';
+  status.textContent = "Fetching sheet data…";
+
+  try {
+    const result = await apiFetch("/api/import/zoho", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company, sheet_url: sheetUrl }),
+    });
+    const msg = `✓ ${result.imported} new, ${result.updated} updated, ${result.skipped} skipped${result.errors ? ", " + result.errors + " errors" : ""}`;
+    status.textContent = msg;
+    status.style.color = result.errors ? "#dc2626" : "#16a34a";
+    toast(msg, result.errors ? "error" : "success");
+    await loadHistoryTab();
+  } catch (e) {
+    status.textContent = "Import failed: " + e.message;
+    status.style.color = "#dc2626";
+    toast("Import failed: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "⬇ Import from Zoho Sheet";
+  }
+}
+
+async function loadHistoryTab() {
+  const company = document.getElementById("companySelect").value;
+  if (!company) {
+    document.getElementById("historyTableWrap").innerHTML =
+      `<div class="empty-state"><div class="icon">📜</div><p>Select a company to view payment history</p></div>`;
+    return;
+  }
+
+  const from  = document.getElementById("historyFrom").value;
+  const to    = document.getElementById("historyTo").value;
+  const status  = document.getElementById("historyStatus").value;
+  const location = document.getElementById("historyLocation").value.trim();
+  const source  = document.getElementById("historySource").value;
+
+  const wrap = document.getElementById("historyTableWrap");
+  wrap.innerHTML = `<div class="empty-state"><span class="spinner dark"></span><p style="margin-top:12px">Loading records…</p></div>`;
+
+  try {
+    const params = new URLSearchParams({ company });
+    if (from)     params.set("from", from);
+    if (to)       params.set("to", to);
+    if (status)   params.set("status", status);
+    if (location) params.set("location", location);
+    if (source)   params.set("source", source);
+
+    historyRecords = await apiFetch(`/api/records?${params}`);
+    renderHistoryTable();
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty-state"><p style="color:#dc2626">Failed: ${esc(e.message)}</p></div>`;
+    toast("Load failed: " + e.message, "error");
+  }
+}
+
+function renderHistoryTable() {
+  const wrap = document.getElementById("historyTableWrap");
+
+  if (!historyRecords.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📜</div><p>No records found for the selected filters</p></div>`;
+    document.getElementById("historySummaryBar").style.display = "none";
+    document.getElementById("historyExportBtn").style.display = "none";
+    return;
+  }
+
+  // Summary
+  const total   = historyRecords.length;
+  const totalAmt = historyRecords.reduce((s, r) => s + (r.amount || 0), 0);
+  const processed = historyRecords.filter((r) => r.payment_status === "Processed").length;
+  const pending   = historyRecords.filter((r) => !r.payment_status || r.payment_status === "Pending").length;
+  const zoho      = historyRecords.filter((r) => r.source === "zoho_import").length;
+  const manual    = historyRecords.filter((r) => r.source === "manual").length;
+
+  document.getElementById("histSumTotal").textContent     = total;
+  document.getElementById("histSumAmount").textContent    = "₹" + totalAmt.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  document.getElementById("histSumProcessed").textContent = processed;
+  document.getElementById("histSumPending").textContent   = pending;
+  document.getElementById("histSumZoho").textContent      = zoho;
+  document.getElementById("histSumManual").textContent    = manual;
+  document.getElementById("historySummaryBar").style.display = "flex";
+  document.getElementById("historyExportBtn").style.display  = "inline-flex";
+
+  const statusStyle = {
+    Processed: "background:#d1fae5;color:#065f46",
+    Pending:   "background:#fef3c7;color:#92400e",
+    Rejected:  "background:#fee2e2;color:#991b1b",
+  };
+
+  const tbody = historyRecords.map((r) => {
+    const statusBadge = r.payment_status
+      ? `<span class="status-badge" style="${statusStyle[r.payment_status] || "background:#e5e7eb;color:#374151"}">${esc(r.payment_status)}</span>`
+      : `<span style="color:#aaa">—</span>`;
+    const sourceBadge = r.source === "zoho_import"
+      ? `<span class="status-badge" style="background:#e0e7ff;color:#3730a3;font-size:11px">Zoho</span>`
+      : `<span class="status-badge" style="background:#f0fdf4;color:#166534;font-size:11px">Manual</span>`;
+    return `<tr>
+      <td><span style="font-family:monospace;font-size:12px;color:#4f6ef7">${esc(r.prf_id)}</span></td>
+      <td style="white-space:nowrap">${formatDateKey(r.date)}</td>
+      <td class="amount-cell">₹${Number(r.amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+      <td class="narration-cell" title="${esc(r.vendor)}">${esc(r.vendor) || "<span style='color:#aaa'>—</span>"}</td>
+      <td class="narration-cell" title="${esc(r.nature)}">${esc(r.nature) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.location) || "<span style='color:#aaa'>—</span>"}</td>
+      <td style="font-size:12px;color:#555">${esc(r.sub_division) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.payment_head) || "<span style='color:#aaa'>—</span>"}</td>
+      <td style="font-size:12px">${esc(r.raised_by) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${statusBadge}</td>
+      <td>${sourceBadge}</td>
+    </tr>`;
+  }).join("");
+
+  wrap.innerHTML = `<table>
+    <thead>
+      <tr>
+        <th>PRF ID</th><th>Date</th><th>Amount</th><th>Vendor</th>
+        <th>Nature of Work</th><th>Location</th><th>Sub-Division</th>
+        <th>Payment Head</th><th>Raised By</th><th>Status</th><th>Source</th>
+      </tr>
+    </thead>
+    <tbody>${tbody}</tbody>
+  </table>`;
+}
+
+function clearHistoryFilters() {
+  ["historyFrom", "historyTo", "historyLocation"].forEach((id) => {
+    document.getElementById(id).value = "";
+  });
+  document.getElementById("historyStatus").value = "";
+  document.getElementById("historySource").value = "";
+  loadHistoryTab();
+}
+
+function exportHistoryCSV() {
+  if (!historyRecords.length) return;
+  const headers = [
+    "PRF ID", "Date", "Amount", "Vendor", "Nature of Work", "Location",
+    "Sub-Division", "Payment Head", "Raised By", "Mail ID",
+    "Payment Done/Required", "Payment Type", "Invoice Type", "Invoice Ref",
+    "Vendor Mobile", "Payment Priority", "Approved By",
+    "Payment Status", "Payment Mode (Accounts)", "Expense Category",
+    "Accounts Remarks", "Source",
+  ];
+  const q = (r, f) => `"${(r[f] || "").replace(/"/g, '""')}"`;
+  const csvLines = [
+    headers.join(","),
+    ...historyRecords.map((r) => [
+      r.prf_id, formatDateKey(r.date), r.amount || 0,
+      q(r, "vendor"), q(r, "nature"), q(r, "location"),
+      q(r, "sub_division"), q(r, "payment_head"), q(r, "raised_by"), r.mail_id,
+      r.payment_done_required, r.payment_type, r.invoice_type, r.invoice_ref,
+      r.vendor_mobile, r.payment_priority, q(r, "approved_by"),
+      r.payment_status, r.payment_mode, r.category,
+      q(r, "accounts_remarks"), r.source,
+    ].join(","))
+  ];
+  const blob = new Blob([csvLines.join("\n")], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `payment_history_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
 }
 
 function exportRecordsCSV() {

@@ -41,6 +41,7 @@
     <button class="tab-btn active" data-tab="bank">Bank → Tally</button>
     <button class="tab-btn" data-tab="recon">Reconciliation</button>
     <button class="tab-btn" data-tab="records">Payment Records</button>
+    <button class="tab-btn" data-tab="history">Payment History</button>
   </div>
 
   <!-- ── Tab: Bank → Tally ─────────────────────────────────────────────────── -->
@@ -160,6 +161,76 @@
       </div>
     </div>
   </div><!-- #tabRecords -->
+
+  <!-- ── Tab: Payment History ──────────────────────────────────────────────── -->
+  <div id="tabHistory" style="display:none">
+
+    <!-- Import bar -->
+    <div class="setup-bar" id="historyImportBar">
+      <div class="field" style="flex:1;min-width:300px">
+        <label>Google Sheet URL</label>
+        <input type="text" id="historySheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%" />
+      </div>
+      <button class="btn btn-primary" id="importZohoBtn">⬇ Import from Zoho Sheet</button>
+      <span id="importStatus" style="font-size:13px;color:#555;align-self:center"></span>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="setup-bar">
+      <div class="field">
+        <label>From Date</label>
+        <input type="date" id="historyFrom" style="min-width:150px" />
+      </div>
+      <div class="field">
+        <label>To Date</label>
+        <input type="date" id="historyTo" style="min-width:150px" />
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="historyStatus" style="min-width:140px">
+          <option value="">All Statuses</option>
+          <option value="Processed">Processed</option>
+          <option value="Pending">Pending</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Location</label>
+        <input type="text" id="historyLocation" list="locationList" placeholder="All locations" style="min-width:180px" />
+      </div>
+      <div class="field">
+        <label>Source</label>
+        <select id="historySource" style="min-width:130px">
+          <option value="">All Sources</option>
+          <option value="zoho_import">Zoho Import</option>
+          <option value="manual">Manual</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="historyApplyBtn">Apply</button>
+      <button class="btn btn-outline btn-sm" id="historyClearBtn">Clear</button>
+      <div class="spacer"></div>
+      <button class="btn btn-outline btn-sm" id="historyExportBtn" style="display:none">↓ Export CSV</button>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-bar" id="historySummaryBar" style="display:none">
+      <div class="summary-item"><div class="val" id="histSumTotal">0</div><div class="lbl">Records</div></div>
+      <div class="summary-item"><div class="val" id="histSumAmount">₹0</div><div class="lbl">Total Amount</div></div>
+      <div class="summary-item"><div class="val" id="histSumProcessed" style="color:#16a34a">0</div><div class="lbl">Processed</div></div>
+      <div class="summary-item"><div class="val" id="histSumPending" style="color:#92400e">0</div><div class="lbl">Pending</div></div>
+      <div class="summary-item"><div class="val" id="histSumZoho" style="color:#3730a3">0</div><div class="lbl">Zoho Import</div></div>
+      <div class="summary-item"><div class="val" id="histSumManual" style="color:#0369a1">0</div><div class="lbl">Manual</div></div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap" id="historyTableWrap">
+      <div class="empty-state">
+        <div class="icon">📜</div>
+        <p>Import from Zoho Sheet or apply filters to view payment history</p>
+      </div>
+    </div>
+
+  </div><!-- #tabHistory -->
 
 </div><!-- .container -->
 
@@ -389,6 +460,6 @@
 
 <datalist id="ledgerList"></datalist>
 <div id="toast"></div>
-<script src="/static/app.js?v=14"></script>
+<script src="/static/app.js?v=15"></script>
 </body>
 </html>

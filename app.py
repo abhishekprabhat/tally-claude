@@ -122,11 +122,55 @@ def list_records():
     company = request.args.get("company", "")
     if not company:
         return jsonify({"error": "company parameter required"}), 400
-    from_date = request.args.get("from", "")
-    to_date = request.args.get("to", "")
     try:
-        return jsonify(rec_store.get_records(company, from_date, to_date))
+        return jsonify(rec_store.get_records(
+            company,
+            from_date=request.args.get("from", ""),
+            to_date=request.args.get("to", ""),
+            status=request.args.get("status", ""),
+            location=request.args.get("location", ""),
+            source=request.args.get("source", ""),
+        ))
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/import/zoho", methods=["POST"])
+def import_zoho():
+    data = request.json or {}
+    company = data.get("company", "")
+    sheet_url = data.get("sheet_url", "")
+    if not company:
+        return jsonify({"error": "company required"}), 400
+    if not sheet_url:
+        return jsonify({"error": "sheet_url required"}), 400
+    try:
+        payments = recon_mod.fetch_all_zoho_payments(sheet_url)
+        imported = updated = skipped = errors = 0
+        for p in payments:
+            try:
+                p["company"] = company
+                if not p.get("date"):
+                    skipped += 1
+                    continue
+                # Dedup by PRF ID — reuse existing record's UUID to UPDATE not INSERT
+                if p.get("prf_id"):
+                    existing = rec_store.get_by_prf_id(company, p["prf_id"])
+                    if existing:
+                        p["id"] = existing["id"]
+                        updated += 1
+                    else:
+                        imported += 1
+                else:
+                    imported += 1
+                rec_store.upsert_record(p)
+            except Exception as e:
+                print(f"Import error for PRF {p.get('prf_id', '?')}: {e}")
+                errors += 1
+        print(f"Zoho import complete: {imported} new, {updated} updated, {skipped} skipped, {errors} errors")
+        return jsonify({"imported": imported, "updated": updated, "skipped": skipped, "errors": errors})
+    except Exception as e:
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 

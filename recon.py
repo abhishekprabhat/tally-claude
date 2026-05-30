@@ -43,6 +43,71 @@ def _csv_url(sheet_url: str, sheet_name: str = "") -> str:
     return f"https://docs.google.com/spreadsheets/d/{sid}/gviz/tq?tqx=out:csv&gid={gid}"
 
 
+def _fetch_full_sheet(sheet_url: str, sheet_name: str) -> list[dict]:
+    """Fetch all rows with all fields — used for DB import (not reconciliation)."""
+    url = _csv_url(sheet_url, sheet_name)
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    reader = csv.DictReader(io.StringIO(resp.text))
+    rows = []
+    for row in reader:
+        prf_id = row.get("Unique ID", "").strip()
+        # Date: prefer Payment Date, fall back to form submission date
+        pay_date = row.get("Payment Date", "").strip()
+        sub_date = row.get("Date-Time", "").strip() or row.get("Added Time", "").strip()
+        date_key = _parse_date(pay_date) if pay_date else _parse_date(sub_date)
+        if not date_key and not prf_id:
+            continue  # skip completely empty rows
+        # Amount: prefer Amount Paid (Accounts), fall back to Total Invoice Amount
+        amount = _parse_amount(row.get("Amount Paid (Accounts)", "").strip())
+        if amount == 0:
+            amount = _parse_amount(row.get("Total Invoice Amount", "").strip())
+        rows.append({
+            "prf_id":                prf_id,
+            "date":                  date_key or "",
+            "amount":                amount,
+            "location":              row.get("Payment For Location/Division", "").strip(),
+            "sub_division":          row.get("Sub-Division", "").strip(),
+            "raised_by":             row.get("Request Raised By", "").strip(),
+            "mail_id":               row.get("Mail ID", "").strip(),
+            "nature":                row.get("Nature of Work", "").strip(),
+            "payment_done_required": row.get("Payment Done / Required", "").strip(),
+            "payment_type":          row.get("Payment Type", "").strip(),
+            "payment_head":          row.get("Payment Head", "").strip(),
+            "total_invoice_amount":  _parse_amount(row.get("Total Invoice Amount", "").strip()),
+            "invoice_type":          row.get("Invoice Type", "").strip(),
+            "invoice_ref":           row.get("Invoice OR Reference Number", "").strip(),
+            "payment_mode_available":row.get("Payment Mode Available", "").strip(),
+            "vendor_type":           row.get("Vendor Type (OLD / NEW)", "").strip(),
+            "vendor":                row.get("Vendor Name", "").strip(),
+            "vendor_mobile":         row.get("Vendor Mobile No", "").strip(),
+            "payment_priority":      row.get("Payment Priority", "").strip(),
+            "approved_by":           row.get("Discussed & Approved By", "").strip(),
+            "remarks":               row.get("Remarks If Any", "").strip(),
+            "payment_status":        row.get("Payment Status (Accounts)", "").strip(),
+            "payment_mode":          row.get("Payment Mode (Accounts)", "").strip(),
+            "category":              row.get("Expense Category", "").strip(),
+            "accounts_remarks":      row.get("Accounts Remarks", "").strip(),
+            "source":                "zoho_import",
+        })
+    return rows
+
+
+def fetch_all_zoho_payments(sheet_url: str) -> list[dict]:
+    """Fetch and merge both Zoho tabs. ER takes precedence for same PRF ID."""
+    er = _fetch_full_sheet(sheet_url, "Expense Reporting")
+    pr = _fetch_full_sheet(sheet_url, "Payment Request")
+    merged: dict[str, dict] = {}
+    for row in pr:
+        key = row["prf_id"] or f"_pr_{len(merged)}"
+        merged[key] = row
+    for row in er:
+        key = row["prf_id"] or f"_er_{len(merged)}"
+        merged[key] = row
+    print(f"Zoho import: {len(er)} ER + {len(pr)} PR → {len(merged)} unique rows")
+    return list(merged.values())
+
+
 def _fetch_one_sheet(sheet_url: str, sheet_name: str) -> list[dict]:
     url = _csv_url(sheet_url, sheet_name)
     resp = requests.get(url, timeout=30)
