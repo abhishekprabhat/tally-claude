@@ -166,53 +166,192 @@
 <!-- Record Modal -->
 <div id="recordModal" class="modal-backdrop" style="display:none">
   <div class="modal">
-    <h3 id="modalTitle">Add Payment Record</h3>
-    <div class="modal-grid">
-      <div class="field">
-        <label>Date</label>
-        <input type="date" id="modalDate" />
-      </div>
-      <div class="field">
-        <label>Amount (₹)</label>
-        <input type="number" id="modalAmount" step="0.01" min="0" placeholder="0.00" />
-      </div>
-      <div class="field">
-        <label>Vendor Name</label>
-        <input type="text" id="modalVendor" placeholder="Vendor / Payee name" />
-      </div>
-      <div class="field">
-        <label>Payment Mode</label>
-        <select id="modalPaymentMode">
-          <option value="">Select...</option>
-          <option value="NEFT">NEFT</option>
-          <option value="IMPS">IMPS</option>
-          <option value="RTGS">RTGS</option>
-          <option value="UPI">UPI</option>
-          <option value="Cheque">Cheque</option>
-          <option value="Cash">Cash</option>
-        </select>
-      </div>
-      <div class="field full">
-        <label>Nature of Work</label>
-        <input type="text" id="modalNature" placeholder="What is this payment for?" />
-      </div>
-      <div class="field">
-        <label>Expense Category</label>
-        <input type="text" id="modalCategory" placeholder="e.g. Operations, Marketing" />
-      </div>
-      <div class="field">
-        <label>Location / Division</label>
-        <input type="text" id="modalLocation" placeholder="e.g. Bangalore" />
-      </div>
-      <div class="field full">
-        <label>Notes / Narration</label>
-        <textarea id="modalNarration" rows="2" placeholder="Additional notes or Tally narration..."></textarea>
-      </div>
-      <div class="field">
-        <label>PRF ID (optional)</label>
-        <input type="text" id="modalPrfId" placeholder="Link to Zoho PRF ID" />
+    <h3 id="modalTitle">Payment Request Form</h3>
+    <div class="modal-prf" id="modalPrfDisplay"></div>
+
+    <!-- Section 1: Request Details -->
+    <div class="form-section">
+      <div class="form-section-title">Request Details</div>
+      <div class="modal-grid">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="modalDate" />
+        </div>
+        <div class="field">
+          <label>Payment For Location / Division</label>
+          <input type="text" id="modalLocation" list="locationList" placeholder="Select or type..." />
+        </div>
+        <div class="field">
+          <label>Sub-Division</label>
+          <input type="text" id="modalSubDivision" list="subDivisionList" placeholder="Select or type..." />
+        </div>
+        <div class="field">
+          <label>Request Raised By</label>
+          <input type="text" id="modalRaisedBy" placeholder="Employee name / ID" />
+        </div>
+        <div class="field">
+          <label>Mail ID</label>
+          <input type="email" id="modalMailId" placeholder="employee@techxr.co" />
+        </div>
+        <div class="field">
+          <label>Payment Done / Required</label>
+          <select id="modalPaymentDoneRequired">
+            <option value="">Select...</option>
+            <option value="Required">Required</option>
+            <option value="Already Done / Auto Debit">Already Done / Auto Debit</option>
+          </select>
+        </div>
       </div>
     </div>
+
+    <!-- Section 2: Payment Details -->
+    <div class="form-section">
+      <div class="form-section-title">Payment Details</div>
+      <div class="modal-grid">
+        <div class="field full">
+          <label>Nature of Work</label>
+          <input type="text" id="modalNature" placeholder="Describe what this payment is for" />
+        </div>
+        <div class="field">
+          <label>Payment Type</label>
+          <select id="modalPaymentType">
+            <option value="">Select...</option>
+            <option value="Full Payment">Full Payment</option>
+            <option value="Advance Payment">Advance Payment</option>
+            <option value="Balance Payment">Balance Payment</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Payment Head</label>
+          <input type="text" id="modalPaymentHead" list="paymentHeadList" placeholder="Select or type..." />
+        </div>
+        <div class="field">
+          <label>Total Invoice Amount (₹)</label>
+          <input type="number" id="modalTotalInvoiceAmount" step="0.01" min="0" placeholder="0.00" />
+        </div>
+        <div class="field">
+          <label>Invoice Type</label>
+          <select id="modalInvoiceType">
+            <option value="">Select...</option>
+            <option value="GST - Invoice">GST - Invoice</option>
+            <option value="Without GST - Invoice">Without GST - Invoice</option>
+            <option value="Performa Invoice">Performa Invoice</option>
+            <option value="Kacha Bill">Kacha Bill</option>
+            <option value="No Bill">No Bill</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Invoice / Reference Number</label>
+          <input type="text" id="modalInvoiceRef" placeholder="Ref / Invoice no." />
+        </div>
+        <div class="field">
+          <label>Payment Mode Available</label>
+          <select id="modalPaymentModeAvailable">
+            <option value="">Select...</option>
+            <option value="Bank Account">Bank Account</option>
+            <option value="Cash Only">Cash Only</option>
+            <option value="Bank Account, Cash Only">Bank Account, Cash Only</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Payment Priority</label>
+          <select id="modalPaymentPriority">
+            <option value="">Select...</option>
+            <option value="Immediate (3Hrs)">Immediate (3Hrs)</option>
+            <option value="High (2Days)">High (2Days)</option>
+            <option value="Medium (5Days)">Medium (5Days)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 3: Vendor -->
+    <div class="form-section">
+      <div class="form-section-title">Vendor Details</div>
+      <div class="modal-grid">
+        <div class="field">
+          <label>Vendor Type</label>
+          <select id="modalVendorType">
+            <option value="">Select...</option>
+            <option value="Already Added Old Vendor">Already Added Old Vendor</option>
+            <option value="New Vendor">New Vendor</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Vendor Name</label>
+          <input type="text" id="modalVendor" placeholder="Vendor / payee name" />
+        </div>
+        <div class="field">
+          <label>Vendor Mobile No</label>
+          <input type="text" id="modalVendorMobile" placeholder="Mobile number" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Approval -->
+    <div class="form-section">
+      <div class="form-section-title">Approval</div>
+      <div class="modal-grid">
+        <div class="field">
+          <label>Discussed &amp; Approved By</label>
+          <input type="text" id="modalApprovedBy" placeholder="Approver name / ID" />
+        </div>
+        <div class="field full">
+          <label>Remarks (if any)</label>
+          <textarea id="modalRemarks" rows="2" placeholder="Any notes or remarks..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Accounts (Finance fills this) -->
+    <div class="form-section">
+      <div class="form-section-title">Accounts — Finance</div>
+      <div class="modal-grid">
+        <div class="field">
+          <label>Payment Status</label>
+          <select id="modalPaymentStatus">
+            <option value="">Select...</option>
+            <option value="Processed">Processed</option>
+            <option value="Pending">Pending</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Payment Date</label>
+          <input type="date" id="modalPaymentDate" />
+        </div>
+        <div class="field">
+          <label>Amount Paid (₹)</label>
+          <input type="number" id="modalAmount" step="0.01" min="0" placeholder="0.00" />
+        </div>
+        <div class="field">
+          <label>Payment Mode (Accounts)</label>
+          <select id="modalPaymentMode">
+            <option value="">Select...</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="NEFT">NEFT</option>
+            <option value="IMPS">IMPS</option>
+            <option value="RTGS">RTGS</option>
+            <option value="UPI">UPI</option>
+            <option value="Cheque">Cheque</option>
+            <option value="Cash">Cash</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Expense Category</label>
+          <select id="modalCategory">
+            <option value="">Select...</option>
+            <option value="Revenue Expenses">Revenue Expenses</option>
+            <option value="Capital Expenses">Capital Expenses</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Accounts Remarks</label>
+          <textarea id="modalAccountsRemarks" rows="2" placeholder="Accounts notes / narration..."></textarea>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn btn-outline" id="modalCancelBtn">Cancel</button>
       <button class="btn btn-primary" id="modalSaveBtn">Save Record</button>
@@ -220,8 +359,50 @@
   </div>
 </div>
 
+<!-- Datalists for form autocomplete -->
+<datalist id="locationList">
+  <option value="Ayodhya"><option value="Bageshwar Dham"><option value="Bhopal-Accounts">
+  <option value="Bhopal-BD"><option value="Bhopal-Content"><option value="Bhopal-Ecommerce">
+  <option value="Bhopal-HO"><option value="Bhopal-HR"><option value="Bhopal-Inventory">
+  <option value="Bhopal-Kendra HO"><option value="Bhopal-Tech"><option value="Delhi">
+  <option value="Delhi NCR"><option value="Dewas"><option value="HO - Bhopal">
+  <option value="Haridwar"><option value="Indore-Railway"><option value="Jammu">
+  <option value="Kashi"><option value="Kurukshetra"><option value="Maihar">
+  <option value="Nagpur"><option value="Neelkanth Dham"><option value="Prayagraj">
+  <option value="Salary"><option value="Shirdi"><option value="Ujjain">
+  <option value="Ujjain-Railway"><option value="Vaishno Devi"><option value="Vrindavan">
+</datalist>
+<datalist id="subDivisionList">
+  <option value="Accounts - Consultancy"><option value="Accounts - GST"><option value="Accounts - Others">
+  <option value="Accounts - TDS"><option value="Ayodhya - Office Expense"><option value="Ayodhya - Others">
+  <option value="BD - Others"><option value="BD - Travel"><option value="Content - Others">
+  <option value="Content - Software"><option value="Ecommerce - Ads"><option value="Ecommerce - Others">
+  <option value="Ecommerce - Shipping"><option value="HO - Office Expense"><option value="HO - Others">
+  <option value="HO - Rent"><option value="HR - Hospitality"><option value="HR - Others">
+  <option value="Haridwar - Office Expense"><option value="Haridwar - Others"><option value="Inventory - Others">
+  <option value="Kashi - Office Expense"><option value="Kashi - Others"><option value="Kendra HO - Branding">
+  <option value="Kurukshetra - Office Expense"><option value="Maihar - Office Expense">
+  <option value="Nagpur - Office Expense"><option value="Salary - Net Payout"><option value="Salary - Others">
+  <option value="Salary - PF"><option value="Tech - Cloud"><option value="Tech - Others">
+  <option value="Tech - Software Subscription"><option value="Ujjain - Office Expense"><option value="Ujjain - Others">
+  <option value="Vrindavan - Office Expense">
+</datalist>
+<datalist id="paymentHeadList">
+  <option value="Office Expense"><option value="Business Promotion Expense">
+  <option value="Subscription Expenses"><option value="Capital Expense">
+  <option value="Inventory Purchases"><option value="Printing &amp; Stationery Expenses">
+  <option value="Building &amp; Center Development Expenses"><option value="Electricity">
+  <option value="Repair &amp; Maintenance"><option value="Bank Charges">
+  <option value="Branding"><option value="Travel Expense"><option value="Salary">
+  <option value="Rent Expense"><option value="Commission"><option value="Consultancy">
+  <option value="Legal Charges"><option value="Insurance"><option value="Manpower services">
+  <option value="Professional Charges"><option value="Courier &amp; Postage Expenses">
+  <option value="Internet &amp; Recharge Expense"><option value="Food Expense">
+  <option value="Asset Purchase"><option value="Duties &amp; Taxes">
+</datalist>
+
 <datalist id="ledgerList"></datalist>
 <div id="toast"></div>
-<script src="/static/app.js?v=12"></script>
+<script src="/static/app.js?v=13"></script>
 </body>
 </html>

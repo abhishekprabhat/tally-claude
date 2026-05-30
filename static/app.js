@@ -721,21 +721,56 @@ let currentModalContext = null;
 
 function openRecordModal(rowData, recordId = null, mode = "recon") {
   currentModalContext = { mode, rowData, recordId };
-  document.getElementById("modalTitle").textContent = recordId ? "Edit Payment Record" : "Add Payment Record";
 
+  const isEdit = !!recordId;
+  document.getElementById("modalTitle").textContent = isEdit ? "Edit Payment Record" : "Payment Request Form";
+
+  // Show PRF ID if editing
+  const prfDisp = document.getElementById("modalPrfDisplay");
+  prfDisp.textContent = isEdit && rowData.prf_id ? `ID: ${rowData.prf_id}` : (isEdit ? "" : "New request — ID will be auto-assigned");
+
+  // Section 1: Request Details
   const dateKey = rowData.date_key || rowData.date || "";
   document.getElementById("modalDate").value = dateKeyToInput(dateKey);
-  document.getElementById("modalAmount").value = rowData.amount || "";
-  document.getElementById("modalVendor").value = rowData.vendor || "";
-  document.getElementById("modalPaymentMode").value = rowData.payment_mode || "";
-  document.getElementById("modalNature").value = rowData.nature || "";
-  document.getElementById("modalCategory").value = rowData.category || "";
   document.getElementById("modalLocation").value = rowData.location || "";
-  document.getElementById("modalNarration").value = rowData.narration || rowData.tally_narration || "";
-  document.getElementById("modalPrfId").value = rowData.prf_id || "";
+  document.getElementById("modalSubDivision").value = rowData.sub_division || "";
+  document.getElementById("modalRaisedBy").value = rowData.raised_by || "";
+  document.getElementById("modalMailId").value = rowData.mail_id || "";
+  document.getElementById("modalPaymentDoneRequired").value = rowData.payment_done_required ||
+    (mode === "recon" || mode === "recon_edit" ? "Already Done / Auto Debit" : "");
+
+  // Section 2: Payment Details
+  document.getElementById("modalNature").value = rowData.nature || "";
+  document.getElementById("modalPaymentType").value = rowData.payment_type || "Full Payment";
+  document.getElementById("modalPaymentHead").value = rowData.payment_head || "";
+  document.getElementById("modalTotalInvoiceAmount").value = rowData.total_invoice_amount || "";
+  document.getElementById("modalInvoiceType").value = rowData.invoice_type || "";
+  document.getElementById("modalInvoiceRef").value = rowData.invoice_ref || "";
+  document.getElementById("modalPaymentModeAvailable").value = rowData.payment_mode_available || "Bank Account";
+  document.getElementById("modalPaymentPriority").value = rowData.payment_priority || "";
+
+  // Section 3: Vendor
+  document.getElementById("modalVendorType").value = rowData.vendor_type || "Already Added Old Vendor";
+  document.getElementById("modalVendor").value = rowData.vendor || "";
+  document.getElementById("modalVendorMobile").value = rowData.vendor_mobile || "";
+
+  // Section 4: Approval
+  document.getElementById("modalApprovedBy").value = rowData.approved_by || "";
+  document.getElementById("modalRemarks").value = rowData.remarks || "";
+
+  // Section 5: Accounts
+  document.getElementById("modalPaymentStatus").value = rowData.payment_status ||
+    (mode === "recon" || mode === "recon_edit" ? "Processed" : "Pending");
+  document.getElementById("modalPaymentDate").value = dateKeyToInput(
+    rowData.date_key || rowData.date || ""
+  );
+  document.getElementById("modalAmount").value = rowData.amount || "";
+  document.getElementById("modalPaymentMode").value = rowData.payment_mode || "Bank Transfer";
+  document.getElementById("modalCategory").value = rowData.category || "Revenue Expenses";
+  document.getElementById("modalAccountsRemarks").value = rowData.accounts_remarks || rowData.tally_narration || rowData.narration || "";
 
   document.getElementById("recordModal").style.display = "flex";
-  setTimeout(() => document.getElementById("modalVendor").focus(), 50);
+  setTimeout(() => document.getElementById("modalNature").focus(), 50);
 }
 
 function closeRecordModal() {
@@ -754,19 +789,39 @@ async function saveRecord() {
   if (!dateInput) return toast("Date is required", "error");
 
   const amount = parseFloat(document.getElementById("modalAmount").value);
-  if (!amount || amount <= 0) return toast("Valid amount is required", "error");
+  if (!amount || amount <= 0) return toast("Valid amount required in Accounts section", "error");
 
   const payload = {
     company,
+    // Section 1
     date: dateInput,
-    amount,
-    vendor: document.getElementById("modalVendor").value.trim(),
-    payment_mode: document.getElementById("modalPaymentMode").value,
-    nature: document.getElementById("modalNature").value.trim(),
-    category: document.getElementById("modalCategory").value.trim(),
     location: document.getElementById("modalLocation").value.trim(),
-    narration: document.getElementById("modalNarration").value.trim(),
-    prf_id: document.getElementById("modalPrfId").value.trim(),
+    sub_division: document.getElementById("modalSubDivision").value.trim(),
+    raised_by: document.getElementById("modalRaisedBy").value.trim(),
+    mail_id: document.getElementById("modalMailId").value.trim(),
+    payment_done_required: document.getElementById("modalPaymentDoneRequired").value,
+    // Section 2
+    nature: document.getElementById("modalNature").value.trim(),
+    payment_type: document.getElementById("modalPaymentType").value,
+    payment_head: document.getElementById("modalPaymentHead").value.trim(),
+    total_invoice_amount: parseFloat(document.getElementById("modalTotalInvoiceAmount").value) || 0,
+    invoice_type: document.getElementById("modalInvoiceType").value,
+    invoice_ref: document.getElementById("modalInvoiceRef").value.trim(),
+    payment_mode_available: document.getElementById("modalPaymentModeAvailable").value,
+    payment_priority: document.getElementById("modalPaymentPriority").value,
+    // Section 3
+    vendor_type: document.getElementById("modalVendorType").value,
+    vendor: document.getElementById("modalVendor").value.trim(),
+    vendor_mobile: document.getElementById("modalVendorMobile").value.trim(),
+    // Section 4
+    approved_by: document.getElementById("modalApprovedBy").value.trim(),
+    remarks: document.getElementById("modalRemarks").value.trim(),
+    // Section 5 (Accounts)
+    payment_status: document.getElementById("modalPaymentStatus").value,
+    amount,
+    payment_mode: document.getElementById("modalPaymentMode").value,
+    category: document.getElementById("modalCategory").value,
+    accounts_remarks: document.getElementById("modalAccountsRemarks").value.trim(),
     source: "manual",
   };
   if (ctx.recordId) payload.id = ctx.recordId;
@@ -843,7 +898,7 @@ function renderRecordsTable() {
   const wrap = document.getElementById("recordsTableWrap");
   const q = (document.getElementById("recordSearch").value || "").toLowerCase();
   const filtered = allRecords.filter((r) =>
-    !q || [r.vendor, r.category, r.nature, r.location, r.narration, r.prf_id]
+    !q || [r.vendor, r.category, r.nature, r.location, r.prf_id, r.payment_head, r.raised_by, r.sub_division, r.accounts_remarks]
       .some((f) => (f || "").toLowerCase().includes(q))
   );
 
@@ -852,29 +907,42 @@ function renderRecordsTable() {
     return;
   }
 
-  const tbody = filtered.map((r) => `
-    <tr>
+  const statusStyle = {
+    Processed: "background:#d1fae5;color:#065f46",
+    Pending:   "background:#fef3c7;color:#92400e",
+    Rejected:  "background:#fee2e2;color:#991b1b",
+  };
+
+  const tbody = filtered.map((r) => {
+    const statusBadge = r.payment_status
+      ? `<span class="status-badge" style="${statusStyle[r.payment_status] || "background:#e5e7eb;color:#374151"}">${esc(r.payment_status)}</span>`
+      : `<span style="color:#aaa">—</span>`;
+    const priorityBadge = r.payment_priority
+      ? `<span class="status-badge" style="background:#ede9fe;color:#5b21b6;font-size:11px">${esc(r.payment_priority)}</span>`
+      : "";
+    return `<tr>
+      <td style="white-space:nowrap"><span style="font-family:monospace;font-size:12px;color:#4f6ef7">${esc(r.prf_id)}</span></td>
       <td style="white-space:nowrap">${formatDateKey(r.date)}</td>
       <td class="amount-cell">₹${Number(r.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
       <td class="narration-cell" title="${esc(r.vendor)}">${esc(r.vendor) || "<span style='color:#aaa'>—</span>"}</td>
-      <td>${esc(r.category) || "<span style='color:#aaa'>—</span>"}</td>
       <td class="narration-cell" title="${esc(r.nature)}">${esc(r.nature) || "<span style='color:#aaa'>—</span>"}</td>
       <td>${esc(r.location) || "<span style='color:#aaa'>—</span>"}</td>
-      <td>${esc(r.payment_mode) || "<span style='color:#aaa'>—</span>"}</td>
-      <td><span style="font-family:monospace;font-size:12px">${esc(r.prf_id)}</span></td>
-      <td><span class="status-badge" style="${r.source === "zoho_import" ? "background:#e0e7ff;color:#3730a3" : "background:#f0fdf4;color:#166534"}">${r.source === "zoho_import" ? "Zoho Import" : "Manual"}</span></td>
+      <td style="font-size:12px;color:#555">${esc(r.sub_division) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${esc(r.payment_head) || "<span style='color:#aaa'>—</span>"}</td>
+      <td>${statusBadge} ${priorityBadge}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-outline edit-record-btn" data-id="${r.id}" style="margin-right:4px">Edit</button>
         <button class="btn btn-sm del-record-btn" data-id="${r.id}" style="background:#fee2e2;color:#991b1b;border:none">Delete</button>
       </td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("");
 
   wrap.innerHTML = `<table>
     <thead>
       <tr>
-        <th>Date</th><th>Amount</th><th>Vendor</th><th>Category</th>
-        <th>Nature</th><th>Location</th><th>Mode</th><th>PRF ID</th>
-        <th>Source</th><th>Actions</th>
+        <th>PRF ID</th><th>Date</th><th>Amount</th><th>Vendor</th>
+        <th>Nature of Work</th><th>Location</th><th>Sub-Division</th>
+        <th>Payment Head</th><th>Status</th><th>Actions</th>
       </tr>
     </thead>
     <tbody>${tbody}</tbody>
@@ -905,22 +973,31 @@ function renderRecordsTable() {
 function exportRecordsCSV() {
   const q = (document.getElementById("recordSearch").value || "").toLowerCase();
   const filtered = allRecords.filter((r) =>
-    !q || [r.vendor, r.category, r.nature, r.location, r.narration, r.prf_id]
+    !q || [r.vendor, r.category, r.nature, r.location, r.prf_id, r.payment_head, r.raised_by]
       .some((f) => (f || "").toLowerCase().includes(q))
   );
   if (!filtered.length) return;
-  const headers = ["Date", "Amount", "Vendor", "Category", "Nature", "Location", "Mode", "PRF ID", "Narration", "Source"];
+  const headers = [
+    "PRF ID", "Date", "Location", "Sub-Division", "Raised By", "Mail ID",
+    "Nature of Work", "Payment Done/Required", "Payment Type", "Payment Head",
+    "Total Invoice Amount", "Invoice Type", "Invoice Ref",
+    "Vendor Type", "Vendor Name", "Vendor Mobile",
+    "Payment Priority", "Approved By", "Remarks",
+    "Payment Status", "Payment Date (Accounts)", "Amount Paid",
+    "Payment Mode (Accounts)", "Expense Category", "Accounts Remarks",
+  ];
+  const q2 = (r, f) => `"${(r[f] || "").replace(/"/g, '""')}"`;
   const csvLines = [
     headers.join(","),
     ...filtered.map((r) => [
-      formatDateKey(r.date), r.amount,
-      `"${(r.vendor || "").replace(/"/g, '""')}"`,
-      `"${(r.category || "").replace(/"/g, '""')}"`,
-      `"${(r.nature || "").replace(/"/g, '""')}"`,
-      `"${(r.location || "").replace(/"/g, '""')}"`,
-      r.payment_mode, r.prf_id,
-      `"${(r.narration || "").replace(/"/g, '""')}"`,
-      r.source,
+      r.prf_id, formatDateKey(r.date),
+      q2(r, "location"), q2(r, "sub_division"), q2(r, "raised_by"), r.mail_id,
+      q2(r, "nature"), r.payment_done_required, r.payment_type, q2(r, "payment_head"),
+      r.total_invoice_amount, r.invoice_type, r.invoice_ref,
+      r.vendor_type, q2(r, "vendor"), r.vendor_mobile,
+      r.payment_priority, q2(r, "approved_by"), q2(r, "remarks"),
+      r.payment_status, formatDateKey(r.date), r.amount,
+      r.payment_mode, r.category, q2(r, "accounts_remarks"),
     ].join(","))
   ];
   const blob = new Blob([csvLines.join("\n")], { type: "text/csv" });

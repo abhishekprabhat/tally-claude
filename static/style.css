@@ -315,29 +315,42 @@ tbody tr.row-local-record { background: #fffbeb; }
   position: fixed; inset: 0;
   background: rgba(0,0,0,.45);
   z-index: 1000;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
 }
 .modal {
   background: #fff;
   border-radius: 12px;
   padding: 28px 28px 20px;
-  width: 560px; max-width: 95vw;
+  width: 720px; max-width: 100%;
   box-shadow: 0 8px 32px rgba(0,0,0,.22);
-  max-height: 90vh; overflow-y: auto;
+  position: relative;
 }
-.modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; color: #1a1a2e; }
-.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; color: #1a1a2e; }
+.modal-prf { font-size: 13px; color: #6b7280; margin-bottom: 20px; }
+.form-section { margin-top: 18px; }
+.form-section-title {
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .6px;
+  color: #4f6ef7;
+  border-bottom: 1.5px solid #e0e7ff;
+  padding-bottom: 5px; margin-bottom: 12px;
+}
+.modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .modal-grid .field { display: flex; flex-direction: column; gap: 4px; }
 .modal-grid .field.full { grid-column: 1 / -1; }
+.modal-grid .field label { font-size: 11px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; }
 .modal-grid .field input,
 .modal-grid .field select,
 .modal-grid .field textarea {
   border: 1px solid #ddd; border-radius: 6px;
-  padding: 8px 12px; font-size: 14px;
+  padding: 7px 10px; font-size: 13px;
   background: #fafafa; font-family: inherit;
 }
 .modal-grid .field input:focus,
 .modal-grid .field select:focus,
 .modal-grid .field textarea:focus { outline: 2px solid #4f6ef7; border-color: transparent; background: #fff; }
+.modal-grid .field input[readonly] { background: #f0f2f5; color: #6b7280; cursor: default; }
 .modal-grid .field textarea { resize: vertical; }
-.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; border-top: 1px solid #f0f2f5; padding-top: 16px; }
