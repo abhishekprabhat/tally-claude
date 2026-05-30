@@ -158,6 +158,74 @@ def get_existing_vouchers(company: str) -> list[dict]:
         return []
 
 
+def get_payment_vouchers(company: str, bank_ledger: str = "") -> list[dict]:
+    """Fetch only Payment vouchers for reconciliation, optionally filtered to a specific bank ledger.
+
+    Tries ledger-level filtering first; falls back to all Payment vouchers if the filter returns 0
+    (which happens when $$IsLedgerEntry is unsupported by the Tally version).
+    """
+    def _fetch(filter_formula: str) -> list[dict]:
+        xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<ENVELOPE>
+  <HEADER>
+    <VERSION>1</VERSION>
+    <TALLYREQUEST>Export</TALLYREQUEST>
+    <TYPE>Collection</TYPE>
+    <ID>PV</ID>
+  </HEADER>
+  <BODY>
+    <DESC>
+      <STATICVARIABLES>
+        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        <SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY>
+      </STATICVARIABLES>
+      <TDL>
+        <TDLMESSAGE>
+          <COLLECTION NAME="PV" ISMODIFY="No">
+            <TYPE>Voucher</TYPE>
+            <NATIVEMETHOD>Date, Narration, VoucherTypeName, Amount</NATIVEMETHOD>
+            <FILTER>PayFilter</FILTER>
+          </COLLECTION>
+          <SYSTEM TYPE="Formulae" NAME="PayFilter">
+            {filter_formula}
+          </SYSTEM>
+        </TDLMESSAGE>
+      </TDL>
+    </DESC>
+  </BODY>
+</ENVELOPE>"""
+        root = _post(xml, timeout=60)
+        entries = []
+        for v in root.findall(".//VOUCHER"):
+            date = (v.findtext("DATE") or "").strip()
+            narration = (v.findtext("NARRATION") or "").strip()
+            amount_str = (v.findtext("AMOUNT") or "0").strip()
+            try:
+                amount = abs(float(amount_str.replace(",", "")))
+            except Exception:
+                amount = 0.0
+            if date and amount > 0:
+                entries.append({"date": date, "narration": narration, "type": "Payment", "amount": amount})
+        return entries
+
+    try:
+        if bank_ledger:
+            safe = bank_ledger.replace('"', '')
+            entries = _fetch(f'$VoucherTypeName = "Payment" AND $$IsLedgerEntry:"{safe}"')
+            if entries:
+                print(f"Fetched {len(entries)} Payment vouchers for ledger='{bank_ledger}'")
+                return entries
+            # $$IsLedgerEntry not supported — fall back to all Payment vouchers
+            print(f"Note: ledger filter unsupported, fetching all Payment vouchers")
+
+        entries = _fetch('$VoucherTypeName = "Payment"')
+        print(f"Fetched {len(entries)} Payment vouchers (all) for company={company!r}")
+        return entries
+    except Exception as e:
+        print(f"Warning: Could not fetch payment vouchers: {e}")
+        return []
+
+
 def mark_tally_duplicates(company: str, transactions: list[dict]) -> bool:
     """Query Tally for existing bank vouchers and mark matching transactions as duplicates.
 
