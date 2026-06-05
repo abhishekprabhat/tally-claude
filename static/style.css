@@ -333,6 +333,9 @@ select.type-select {
 /* Active filter button */
 .recon-filter-btn.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
 
+/* Tally row with its inline form open */
+tr.inline-form-anchor { outline: 2px solid #38bdf8; outline-offset: -2px; background: #f0f9ff !important; }
+
 /* Fine-print metadata under Nature cell in matched recon rows */
 .rec-fineprint { font-size: 11px; color: #94a3b8; margin-top: 2px; white-space: nowrap; }
 

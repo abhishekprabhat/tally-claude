@@ -812,16 +812,21 @@ function _buildSubdivisionOptions(loc, selected) {
 
 function openInlineForm(btn) {
   const tallyTr = btn.closest("tr");
-  // Close any already-open inline form
+  // Close any already-open inline form (and clear its highlight)
   const existing = tallyTr.parentElement.querySelector(".inline-form-row");
-  if (existing) existing.remove();
+  if (existing) {
+    existing.previousElementSibling?.classList.remove("inline-form-anchor");
+    existing.remove();
+  }
   // Toggle off if same row clicked again
   if (tallyTr.dataset.inlineOpen === "1") {
     delete tallyTr.dataset.inlineOpen;
+    tallyTr.classList.remove("inline-form-anchor");
     btn.textContent = "+ Create Record";
     return;
   }
   tallyTr.dataset.inlineOpen = "1";
+  tallyTr.classList.add("inline-form-anchor");
   btn.textContent = "✕ Cancel";
 
   const date   = btn.dataset.date;
@@ -929,6 +934,7 @@ function openInlineForm(btn) {
   btn.onclick = () => {
     formTr.remove();
     delete tallyTr.dataset.inlineOpen;
+    tallyTr.classList.remove("inline-form-anchor");
     btn.textContent = "+ Create Record";
     btn.onclick = () => openInlineForm(btn);
   };
