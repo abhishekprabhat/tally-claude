@@ -686,7 +686,7 @@ function renderReconTable() {
 
     let recContent, action;
     if (type === "tally_only") {
-      recContent = `<td class="rc-empty recon-create-cell" colspan="6">
+      recContent = `<td class="rc-empty recon-create-cell" colspan="3">
         <button class="btn btn-sm btn-outline add-inline-record-btn"
           data-date="${r.date_key}" data-amount="${r.amount}"
           data-guid="${esc(r.guid || '')}"
@@ -714,13 +714,16 @@ function renderReconTable() {
         ? `<span>${_fmtAmt(r.amount)}</span><br><span class="tentative-tally-amt">Tally: ${_fmtAmt(r.tally_amount)}</span>`
         : `<span>${_fmtAmt(r.amount)}</span>`;
 
+      // Build fine-print: Location · Sub-Division · Capital/Revenue
+      const fpParts = [location, subDiv, category].filter(Boolean);
+      const finePrint = fpParts.length
+        ? `<div class="rec-fineprint">${fpParts.join(" · ")}</div>`
+        : "";
+
       recContent = `
         <td class="${rcClass}" style="white-space:nowrap">${recAmtFmt}</td>
-        <td class="${rcClass}" style="font-size:12px">${location || "<span style='color:#bbb'>—</span>"}</td>
-        <td class="${rcClass}" style="font-size:12px">${subDiv || "<span style='color:#bbb'>—</span>"}</td>
-        <td class="${rcClass}" style="font-size:12px">${category || "<span style='color:#bbb'>—</span>"}</td>
         <td class="${rcClass}"><span style="font-family:monospace;font-size:12px">${recPrf}</span></td>
-        <td class="${rcClass} narration-cell" title="${nature}">${nature || "<span style='color:#bbb'>—</span>"}</td>
+        <td class="${rcClass} narration-cell" title="${nature}">${nature || "<span style='color:#bbb'>—</span>"}${finePrint}</td>
         <td class="${rcClass}">${action}</td>`;
     }
 
@@ -738,7 +741,7 @@ function renderReconTable() {
     <thead>
       <tr class="recon-header-group">
         <th colspan="5" class="tally-group-header">Tally Entry</th>
-        <th colspan="7" class="record-group-header">Matched Record</th>
+        <th colspan="4" class="record-group-header">Matched Record</th>
       </tr>
       <tr>
         <th class="tc">Status</th>
@@ -747,11 +750,8 @@ function renderReconTable() {
         <th class="tc">Tally PRF</th>
         <th class="tc tc-sep">Narration</th>
         <th>Amount</th>
-        <th>Location</th>
-        <th>Sub-Division</th>
-        <th>Exp. Type</th>
         <th>PRF ID</th>
-        <th>Nature</th>
+        <th>Nature of Work</th>
         <th></th>
       </tr>
     </thead>

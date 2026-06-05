@@ -333,6 +333,9 @@ select.type-select {
 /* Active filter button */
 .recon-filter-btn.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
 
+/* Fine-print metadata under Nature cell in matched recon rows */
+.rec-fineprint { font-size: 11px; color: #94a3b8; margin-top: 2px; white-space: nowrap; }
+
 /* Inline record creation form */
 tr.inline-form-row td { padding: 10px 16px; background: #f0f9ff; border-top: 1px dashed #bae6fd; }
 .inline-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
