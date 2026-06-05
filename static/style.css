@@ -333,6 +333,16 @@ select.type-select {
 /* Active filter button */
 .recon-filter-btn.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
 
+/* Inline record creation form */
+tr.inline-form-row td { padding: 10px 16px; background: #f0f9ff; border-top: 1px dashed #bae6fd; }
+.inline-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.if-label { font-size: 13px; color: #475569; white-space: nowrap; margin-right: 4px; }
+.if-input { height: 32px; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; background: #fff; }
+.if-vendor, .if-nature { flex: 2; min-width: 140px; }
+.if-category    { flex: 1.2; min-width: 130px; }
+.if-location    { flex: 1; min-width: 130px; }
+.if-subdivision { flex: 1.5; min-width: 160px; }
+
 /* Modal */
 .modal-backdrop {
   position: fixed; inset: 0;

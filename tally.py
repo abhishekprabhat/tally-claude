@@ -183,7 +183,7 @@ def get_payment_vouchers(company: str, bank_ledger: str = "") -> list[dict]:
         <TDLMESSAGE>
           <COLLECTION NAME="PV" ISMODIFY="No">
             <TYPE>Voucher</TYPE>
-            <NATIVEMETHOD>Date, Narration, VoucherTypeName, Amount, Reference</NATIVEMETHOD>
+            <NATIVEMETHOD>Date, Narration, VoucherTypeName, Amount, Reference, GUID</NATIVEMETHOD>
             <FILTER>PayFilter</FILTER>
           </COLLECTION>
           <SYSTEM TYPE="Formulae" NAME="PayFilter">
@@ -200,13 +200,14 @@ def get_payment_vouchers(company: str, bank_ledger: str = "") -> list[dict]:
             date = (v.findtext("DATE") or "").strip()
             narration = (v.findtext("NARRATION") or "").strip()
             reference = (v.findtext("REFERENCE") or "").strip()
+            guid = (v.findtext("GUID") or v.get("GUID") or "").strip()
             amount_str = (v.findtext("AMOUNT") or "0").strip()
             try:
                 amount = abs(float(amount_str.replace(",", "")))
             except Exception:
                 amount = 0.0
             if date and amount > 0:
-                entries.append({"date": date, "narration": narration, "reference": reference, "type": "Payment", "amount": amount})
+                entries.append({"date": date, "narration": narration, "reference": reference, "guid": guid, "type": "Payment", "amount": amount})
         return entries
 
     try:
@@ -225,6 +226,40 @@ def get_payment_vouchers(company: str, bank_ledger: str = "") -> list[dict]:
     except Exception as e:
         print(f"Warning: Could not fetch payment vouchers: {e}")
         return []
+
+
+def update_voucher_reference(company: str, guid: str, reference: str) -> bool:
+    """Write a new REFERENCE value back into an existing Tally voucher identified by GUID."""
+    ref_escaped = reference.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    xml = f"""<?xml version="1.0" encoding="utf-8"?>
+<ENVELOPE>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Vouchers</REPORTNAME>
+        <STATICVARIABLES>
+          <SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY>
+        </STATICVARIABLES>
+      </REQUESTDESC>
+      <REQUESTDATA>
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
+          <VOUCHER GUID="{guid}" ACTION="Alter" OBJVIEW="Accounting Voucher View">
+            <REFERENCE>{ref_escaped}</REFERENCE>
+          </VOUCHER>
+        </TALLYMESSAGE>
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
+</ENVELOPE>"""
+    root = _post(xml)
+    error = root.findtext(".//LINEERROR") or root.findtext(".//IMPORTRESULT/ERRORS")
+    if error:
+        raise RuntimeError(f"Tally ALTER error: {error.strip()}")
+    altered = root.findtext(".//IMPORTRESULT/ALTERED") or "0"
+    return altered.strip() != "0"
 
 
 def mark_tally_duplicates(company: str, transactions: list[dict]) -> bool:

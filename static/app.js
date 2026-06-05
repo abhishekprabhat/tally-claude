@@ -687,9 +687,9 @@ function renderReconTable() {
     let recContent, action;
     if (type === "tally_only") {
       recContent = `<td class="rc-empty recon-create-cell" colspan="6">
-        <button class="btn btn-sm btn-outline add-record-btn"
+        <button class="btn btn-sm btn-outline add-inline-record-btn"
           data-date="${r.date_key}" data-amount="${r.amount}"
-          data-prf="${esc(r.prf_id || '')}"
+          data-guid="${esc(r.guid || '')}"
           data-narration="${esc(r.tally_narration || '')}">+ Create Record</button>
       </td><td class="rc-empty"></td>`;
     } else {
@@ -758,15 +758,8 @@ function renderReconTable() {
     <tbody>${tbody}</tbody>
   </table>`;
 
-  wrap.querySelectorAll(".add-record-btn").forEach((btn) =>
-    btn.addEventListener("click", () => {
-      openRecordModal({
-        date_key:       btn.dataset.date,
-        amount:         parseFloat(btn.dataset.amount),
-        tally_narration:btn.dataset.narration,
-        prf_id:         btn.dataset.prf,
-      }, null, "recon");
-    })
+  wrap.querySelectorAll(".add-inline-record-btn").forEach((btn) =>
+    btn.addEventListener("click", () => openInlineForm(btn))
   );
 
   wrap.querySelectorAll(".edit-recon-record-btn").forEach((btn) =>
@@ -775,6 +768,170 @@ function renderReconTable() {
       if (rec) openRecordModal({ date: rec.date_key, ...rec }, rec.record_id, "recon_edit");
     })
   );
+}
+
+// ── Narration similarity matching ────────────────────────────────────────────
+
+function _titleCase(s) {
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Find the best-matched already-reconciled row by narration word overlap.
+// Returns the matched row object, or null if no match scores above threshold.
+function _findSimilarMatch(narration) {
+  if (!narration || !reconData?.matched?.length) return null;
+  const stopWords = new Set(["the","and","for","with","from","neft","imps","rtgs","upi","hdfc","icici","sbi","axis","ref","no","to"]);
+  const words = narration.toLowerCase().split(/[\s\-_\/,.@#]+/)
+    .filter(w => w.length > 2 && !stopWords.has(w) && !/^\d+$/.test(w));
+  if (!words.length) return null;
+  const wordSet = new Set(words);
+
+  let bestScore = 0, bestMatch = null;
+  for (const r of reconData.matched) {
+    if (!r.tally_narration || (!r.vendor && !r.nature)) continue;
+    const rWords = r.tally_narration.toLowerCase().split(/[\s\-_\/,.@#]+/)
+      .filter(w => w.length > 2 && !stopWords.has(w) && !/^\d+$/.test(w));
+    if (!rWords.length) continue;
+    const overlap = rWords.filter(w => wordSet.has(w)).length;
+    const score = overlap / Math.max(wordSet.size, rWords.length);
+    if (score > bestScore) { bestScore = score; bestMatch = r; }
+  }
+  return bestScore >= 0.3 ? bestMatch : null;
+}
+
+// ── Inline form open/save/cancel ─────────────────────────────────────────────
+
+function _buildSubdivisionOptions(loc, selected) {
+  const subs = SUBDIVISION_MAP[loc] || [];
+  const opts = [`<option value="">Sub-Division...</option>`];
+  for (const s of subs) {
+    opts.push(`<option value="${esc(s)}"${s === selected ? " selected" : ""}>${esc(s)}</option>`);
+  }
+  return opts.join("");
+}
+
+function openInlineForm(btn) {
+  const tallyTr = btn.closest("tr");
+  // Close any already-open inline form
+  const existing = tallyTr.parentElement.querySelector(".inline-form-row");
+  if (existing) existing.remove();
+  // Toggle off if same row clicked again
+  if (tallyTr.dataset.inlineOpen === "1") {
+    delete tallyTr.dataset.inlineOpen;
+    btn.textContent = "+ Create Record";
+    return;
+  }
+  tallyTr.dataset.inlineOpen = "1";
+  btn.textContent = "✕ Cancel";
+
+  const date   = btn.dataset.date;
+  const amount = parseFloat(btn.dataset.amount);
+  const guid   = btn.dataset.guid || "";
+  const narr   = btn.dataset.narration || "";
+
+  // Prefill from best-matching already-reconciled entry (by narration similarity)
+  const sim = _findSimilarMatch(narr);
+  const vendor    = sim?.vendor    || "";
+  const nature    = sim?.nature    || "";
+  const category  = sim?.category  || "";
+  const location  = sim?.location  || "";
+  const subDiv    = sim?.sub_division || "";
+
+  const company = document.getElementById("companySelect").value;
+
+  // Build location options
+  const locationOpts = [`<option value="">Location...</option>`,
+    ...Object.keys(SUBDIVISION_MAP).map(loc =>
+      `<option value="${esc(loc)}"${loc === location ? " selected" : ""}>${esc(loc)}</option>`)
+  ].join("");
+
+  const formTr = document.createElement("tr");
+  formTr.className = "inline-form-row";
+  formTr.innerHTML = `
+    <td colspan="12" class="inline-form-cell">
+      <div class="inline-form">
+        <span class="if-label">${date.replace(/(\d{4})(\d{2})(\d{2})/, "$3/$2/$1")} &nbsp; <strong>${_fmtAmt(amount)}</strong></span>
+        <input  class="if-input if-vendor"    placeholder="Vendor"        value="${esc(vendor)}" />
+        <input  class="if-input if-nature"    placeholder="Nature of Work" value="${esc(nature)}" />
+        <select class="if-input if-category">
+          <option value="Revenue Expenses"${category === "Revenue Expenses" ? " selected" : ""}>Revenue Expenses</option>
+          <option value="Capital Expenses"${category === "Capital Expenses" ? " selected" : ""}>Capital Expenses</option>
+        </select>
+        <select class="if-input if-location">${locationOpts}</select>
+        <select class="if-input if-subdivision">${_buildSubdivisionOptions(location, subDiv)}</select>
+        <button class="btn btn-sm btn-primary if-save-btn">Save</button>
+      </div>
+      ${sim ? `<div style="font-size:11px;color:#6b7280;margin-top:4px;padding-left:4px">Prefilled from similar: <em>${esc(sim.tally_narration || "")}</em></div>` : ""}
+    </td>`;
+
+  tallyTr.after(formTr);
+
+  // Cascade location → sub-division
+  formTr.querySelector(".if-location").addEventListener("change", function () {
+    formTr.querySelector(".if-subdivision").innerHTML = _buildSubdivisionOptions(this.value, "");
+  });
+
+  formTr.querySelector(".if-save-btn").addEventListener("click", async () => {
+    const saveBtn = formTr.querySelector(".if-save-btn");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+    const payload = {
+      company,
+      date,
+      amount,
+      vendor:          formTr.querySelector(".if-vendor").value.trim(),
+      nature:          formTr.querySelector(".if-nature").value.trim(),
+      category:        formTr.querySelector(".if-category").value,
+      location:        formTr.querySelector(".if-location").value.trim(),
+      sub_division:    formTr.querySelector(".if-subdivision").value.trim(),
+      payment_status:  "Processed",
+      payment_done_required: "Already Done / Auto Debit",
+      source:          "manual",
+    };
+    try {
+      // Step 1: Create record (backend auto-generates REC-XXXX prf_id)
+      const saved = await apiFetch("/api/records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      // Step 2: Write generated PRF ID back to Tally voucher's REFERENCE field
+      if (guid && saved.prf_id) {
+        try {
+          await apiFetch("/api/tally/update-reference", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ company, guid, reference: saved.prf_id }),
+          });
+        } catch (tallyErr) {
+          // Non-fatal — record was saved, just couldn't update Tally
+          toast(`Record saved as ${saved.prf_id} (Tally update failed: ${tallyErr.message})`, "info");
+          formTr.remove();
+          tallyTr.remove();
+          const el = document.getElementById("reconSumTallyOnly");
+          if (el) el.textContent = Math.max(0, parseInt(el.textContent) - 1);
+          return;
+        }
+      }
+      toast(`Record saved: ${saved.prf_id || ""}`, "success");
+      formTr.remove();
+      tallyTr.remove();
+      const el = document.getElementById("reconSumTallyOnly");
+      if (el) el.textContent = Math.max(0, parseInt(el.textContent) - 1);
+    } catch (e) {
+      toast("Save failed: " + e.message, "error");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
+  });
+
+  // Cancel
+  btn.onclick = () => {
+    formTr.remove();
+    delete tallyTr.dataset.inlineOpen;
+    btn.textContent = "+ Create Record";
+    btn.onclick = () => openInlineForm(btn);
+  };
 }
 
 function exportReconCSV() {

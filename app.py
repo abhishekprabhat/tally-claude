@@ -204,6 +204,22 @@ def delete_record(record_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/tally/update-reference", methods=["POST"])
+def update_tally_reference():
+    data = request.json or {}
+    company = data.get("company", "")
+    guid = data.get("guid", "")
+    reference = data.get("reference", "")
+    if not company or not guid or not reference:
+        return jsonify({"error": "company, guid, and reference required"}), 400
+    try:
+        ok = tally.update_voucher_reference(company, guid, reference)
+        return jsonify({"success": ok})
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/debug/sheet")
 def debug_sheet():
     url = request.args.get("url", "")

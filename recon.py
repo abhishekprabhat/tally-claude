@@ -202,6 +202,7 @@ def reconcile(sheet_payments: list[dict], tally_vouchers: list[dict],
             "date_key": v["date"], "date_raw": v["date"], "amount": v["amount"],
             "tally_narration": v.get("narration", ""), "tally_type": v.get("type", ""),
             "tally_reference": v.get("reference", ""),
+            "guid": v.get("guid", ""),
             "status": "", "prf_id": v.get("reference", ""), "vendor": "", "nature": "",
             "category": "", "location": "", "payment_mode": "",
         }
